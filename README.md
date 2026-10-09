@@ -5,7 +5,7 @@
 ## 公開ページ
 
 * [青空サーチ](http://pansy.s1010.xrea.com/aozora_search/index.html)
-* [青空文庫全文検索](http://pansy.s1010.xrea.com/ao_fulltext.html)
+* [青空文庫全文検索](http://pansy.s1010.xrea.com/aozora_search/ao_fulltext.html)
 
 ## このリポジトリについて
 
