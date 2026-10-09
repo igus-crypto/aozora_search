@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>青空文庫全文検索</title>
+<style>
+body {
+    font-family: sans-serif;
+    margin: 30px;
+    line-height: 1.7;
+}
+h1 {
+    font-size: 1.5em;
+}
+#keyword {
+    width: 300px;
+    padding: 8px;
+    font-size: 16px;
+}
+button {
+    padding: 8px 20px;
+    font-size: 16px;
+}
+#result {
+    margin-top: 20px;
+}
+.work {
+    border: 1px solid #ccc;
+    padding: 12px;
+    margin-bottom: 15px;
+    border-radius: 5px;
+}
+.info {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+.links {
+    margin-bottom: 8px;
+}
+.links a {
+    margin-right: 12px;
+}
+.snippet {
+    margin-left: 10px;
+}
+.keyword {
+    font-weight: bold;
+    background: yellow;
+}
+/* 検索中の風車 */
+#spinnerArea {
+    text-align: center;
+    margin-top: 20px;
+}
+.spinner {
+    width: 30px;
+    height: 30px;
+    border: 4px solid #ddd;
+    border-top-color: #555;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 20px auto 5px;
+}
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+</style>
+</head>
+<body>
+<h1>青空文庫全文検索</h1>
+<input type="text" id="keyword" placeholder="検索語を入力">
+<label>
+    <input type="checkbox" id="regexp">
+    正規表現
+</label>
+<button onclick="search()">検索</button>
+<div id="spinnerArea"></div>
+<div id="result"></div>
+<script>
+async function search() {
+    const keyword =
+        document.getElementById("keyword").value.trim();
+    if (!keyword) {
+        return;
+    }
+    const regexp =
+        document.getElementById("regexp").checked;
+    const spinnerArea =
+        document.getElementById("spinnerArea");
+    const result =
+        document.getElementById("result");
+    /* 検索開始 */
+    spinnerArea.innerHTML =
+        '<div class="spinner"></div>' +
+        '<div>検索中……</div>';
+    result.innerHTML = "";
+    let found = false;
+    let workCount = 0;
+    let hitCount = 0;
+    try {
+        /* a001 ～ a100 を順番に検索 */
+        for (let i = 1; i <= 100; i++) {
+            const cgi =
+                "ag_" +
+                String(i).padStart(3, "0") +
+                ".cgi";
+            spinnerArea.innerHTML =
+                '<div class="spinner"></div>' +
+                '<div>検索中…… ' +
+                i +
+                ' / 100</div>';
+            const response = await fetch(
+                cgi +
+                "?keyword=" +
+                encodeURIComponent(keyword) +
+                "&regexp=" +
+                (regexp ? "1" : "0")
+            );
+            if (!response.ok) {
+                throw new Error(
+                    "HTTP error: " +
+                    response.status
+                );
+            }
+            const text =
+                await response.text();
+            const lines =
+                text.split("\n");
+            lines.forEach(function(line) {
+                if (!line.trim()) {
+                    return;
+                }
+                const work =
+                    JSON.parse(line);
+                found = true;
+                workCount++;
+                hitCount += work.snippets.length;
+                const workDiv =
+                    document.createElement("div");
+                workDiv.className = "work";
+                const info =
+                    document.createElement("div");
+                info.className = "info";
+                info.textContent =
+                    work.title +
+                    "（" +
+                    work.author +
+                    "）";
+                const links =
+                    document.createElement("div");
+                links.className = "links";
+                links.innerHTML =
+                    '<a href="text/' +
+                    work.f +
+                    '">本文</a>' +
+                    '<a href="' +
+                    work.html_url +
+                    '">HTML</a>' +
+                    '<a href="' +
+                    work.card_url +
+                    '">カード</a>' +
+                    '<a href="text.html?file=text/' +
+                    work.f +
+                    '">エディタ</a>';
+                workDiv.appendChild(info);
+                workDiv.appendChild(links);
+                work.snippets.forEach(
+                    function(text) {
+                        const snippet =
+                            document.createElement("div");
+                        snippet.className =
+                            "snippet";
+                        const escaped =
+                            text
+                                .replace(
+                                    /&/g,
+                                    "&amp;"
+                                )
+                                .replace(
+                                    /</g,
+                                    "&lt;"
+                                )
+                                .replace(
+                                    />/g,
+                                    "&gt;"
+                                );
+                        const highlightPattern =
+                            regexp
+                                ? new RegExp(
+                                    keyword,
+                                    "g"
+                                )
+                                : new RegExp(
+                                    keyword.replace(
+                                        /[.*+?^${}()|[\]\\]/g,
+                                        "\\$&"
+                                    ),
+                                    "g"
+                                );
+                        const highlighted =
+                            escaped.replace(
+                                highlightPattern,
+                                '<span class="keyword">$&</span>'
+                            );
+                        snippet.innerHTML =
+                            highlighted;
+                        workDiv.appendChild(
+                            snippet
+                        );
+                    }
+                );
+                result.appendChild(workDiv);
+            });
+            await new Promise(
+                resolve => setTimeout(resolve, 100)
+            );
+        }
+        /* 検索終了 */
+        spinnerArea.innerHTML = "";
+        if (!found) {
+            result.textContent =
+                "該当する作品はありません。";
+        } else {
+            const count =
+                document.createElement("div");
+            count.className = "info";
+            count.textContent =
+                workCount +
+                "作品・" +
+                hitCount +
+                "箇所";
+            result.insertBefore(
+                count,
+                result.firstChild
+            );
+        }
+    } catch (e) {
+        /* エラー時も風車を消す */
+        spinnerArea.innerHTML = "";
+        result.textContent =
+            "検索中にエラーが発生しました。";
+        console.error(e);
+    }
+}
+</script>
+</body>
+ <hr>
+<footer>
+  <a href="/">HOME</a>
+  <a href="/aozora_search/index.html">青空サーチ</a>
+</footer>
+</html>
