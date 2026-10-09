@@ -1,8 +1,0 @@
-function releaseWakeLock() {
-    if (wakeLock) {
-        wakeLock.release().catch(function(err) {
-            console.log("Wake Lock解除失敗:", err);
-        });
-        wakeLock = null;
-    }
-}
