@@ -5,6 +5,8 @@
 $stdout=open("ao_search.csv","w")
 $stderr=open("tmp_err.txt","w")
 
+require "csv"
+
 print "\uFEFF"
 puts "id,title,author,text_type,inputter,proofreader,"+
   "reading_time,card_url,text_url,html_url"
@@ -30,7 +32,7 @@ File.foreach("list_person_all_extended_utf8.csv",encoding:"UTF-8"){|line|
 # CSVを作成
 times.each{|zip,(txt,time)|
   works[zip].each_with_index{|line, i|
-    s=line.delete('"').split(/,(?![ ])/)
+    s=CSV.parse_line(line)
     if /^[ァ-ヴー・]+$/=~s[15] + s[16]
       name=s[16] +"・"+ s[15]
     else
