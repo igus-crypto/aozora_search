@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>青空サーチ</title>
+<link
+    href="https://unpkg.com/tabulator-tables@6.3.1/dist/css/tabulator.min.css"
+    rel="stylesheet">
+<script src="https://unpkg.com/tabulator-tables@6.3.1/dist/js/tabulator.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.5.3/papaparse.min.js"></script>
+</head>
+<body>
+<h1>青空サーチ</h1>
+<button id="download-selected">選択した作品をダウンロード</button>
+<br><br>
+<!-- =========================================
+     読了時間フィルター
+     ========================================= -->
+<label>
+    読了時間：
+    <input type="number" id="readingTimeMin" min="0" placeholder="下限" style="width:70px;">
+    分 ～
+    <input type="number" id="readingTimeMax" min="0" placeholder="上限" style="width:70px;">
+    分
+<button id="readingTimeSearch">絞り込む</button>
+<button id="readingTimeClear">解除</button>
+</label>
+<br><br>
+<div id="aozora-table"></div>
+<script>
+let table;
+console.time("ページ表示");
+console.time("CSV読み込み");
+// =========================================
+// 読了時間「00h30min」を「30分」に変換
+// =========================================
+function toMinutes(value) {
+    const match = value.match(/(\d+)h(\d+)min/);
+    if (!match) return 0;
+    const hours = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+    return hours * 60 + minutes;
+}
+Papa.parse("ao_search.csv", {
+    download: true,
+    header: true,
+    encoding: "UTF-8",
+    complete: function(results) {
+        console.timeEnd("CSV読み込み");
+        console.time("Tabulator生成");
+        console.log("読み込み件数:", results.data.length);
+        // idのない行（CSV末尾の空行など）を除外
+        const data = results.data
+            .filter(row => row.id)
+            .map(row => ({
+                ...row,
+                reading_time_minutes: toMinutes(row.reading_time)
+            }));
+        // 作品の表示順をランダムにする
+        data.sort(() => Math.random() - 0.5);
+        console.log(data[0]);
+        table = new Tabulator("#aozora-table", {
+            data: data,
+            layout: "fitData",
+            autoResize: false,
+            pagination: true,
+            paginationSize: 30,
+            paginationSizeSelector: [10, 30, 50, 100],
+            movableColumns: true,
+            selectableRows: "highlight",
+            columns: [
+                // 個別選択用チェックボックス
+                {
+                    formatter: "rowSelection",
+                    titleFormatter: "rowSelection",
+                    hozAlign: "center",
+                    headerSort: false,
+                    cellClick: function(e, cell) {
+                        cell.getRow().toggleSelect();
+                    }
+                },
+                {
+                    title: "題名",
+                    field: "title",
+                    headerFilter: "input",
+                    width: 250
+                },
+                {
+                    title: "作者",
+                    field: "author",
+                    headerFilter: "input"
+                },
+                {
+                    title: "入力",
+                    field: "inputter",
+                    headerFilter: "input"
+                },
+                {
+                    title: "校正",
+                    field: "proofreader",
+                    headerFilter: "input"
+                },
+                {
+                    title: "形式",
+                    field: "text_type",
+                    headerFilter: "input"
+                },
+                {
+                    title: "読了時間",
+                    field: "reading_time",
+                    // 表示は「00h30min」のまま
+                    // ソートだけ「分」に換算して行う
+                    sorter: function(a, b) {
+                        return toMinutes(a) - toMinutes(b);
+                    }
+                },
+                // 内部計算用。画面には表示しない
+                {
+                    title: "読了時間（分）",
+                    field: "reading_time_minutes",
+                    visible: false
+                },
+                {
+                    title: "リンク",
+                    formatter: function(cell) {
+                        const row = cell.getRow().getData();
+                        const match = row.card_url.match(/card(\d+)/);
+                        const binb_url = match
+                            ? `https://aozora.binb.jp/reader/main.html?cid=${match[1]}`
+                            : '#';
+                        return `
+                            <a href="text_view.html?file=${encodeURIComponent(row.text_url)}" target="_blank">[text]</a>
+                            <a href="${row.html_url}" target="_blank">[html]</a>
+                            <a href="${row.card_url}" target="_blank">[card]</a>
+                            <a href="${binb_url}" target="_blank">[binb]</a>
+                            <a href="text.html?file=${encodeURIComponent(row.text_url)}" target="_blank">[edit]</a>
+                        `;
+                    }
+                }
+            ],
+            // 表の描画が完了したら計測終了
+            renderComplete: function() {
+                console.timeEnd("ページ表示");
+            }
+        });
+        console.timeEnd("Tabulator生成");
+        // =========================================
+        // 読了時間で絞り込む
+        // =========================================
+        document
+            .getElementById("readingTimeSearch")
+            .addEventListener("click", function() {
+                const minValue =
+                    document.getElementById("readingTimeMin").value;
+                const maxValue =
+                    document.getElementById("readingTimeMax").value;
+                // まず読了時間フィルターを解除
+                table.removeFilter("reading_time_minutes");
+                // 下限が入力されていれば「○分以上」
+                if (minValue !== "") {
+                    table.addFilter(
+                        "reading_time_minutes",
+                        ">=",
+                        Number(minValue)
+                    );
+                }
+                // 上限が入力されていれば「○分以内」
+                if (maxValue !== "") {
+                    table.addFilter(
+                        "reading_time_minutes",
+                        "<=",
+                        Number(maxValue)
+                    );
+                }
+            });
+        // =========================================
+        // 読了時間フィルターを解除
+        // =========================================
+        document
+            .getElementById("readingTimeClear")
+            .addEventListener("click", function() {
+                document.getElementById("readingTimeMin").value = "";
+                document.getElementById("readingTimeMax").value = "";
+                table.removeFilter("reading_time_minutes");
+            });
+    }
+});
+// =========================================
+// 選択した作品をダウンロード
+// =========================================
+document
+    .getElementById("download-selected")
+    .addEventListener("click", function() {
+        const rows = table.getSelectedRows();
+        if (rows.length === 0) {
+            alert("ダウンロードする作品を選択してください。");
+            return;
+        }
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = "download.php";
+        rows.forEach(row => {
+            const data = row.getData();
+            const input = document.createElement("input");
+            input.type = "hidden";
+            input.name = "text_urls[]";
+            input.value = data.text_url;
+            form.appendChild(input);
+        });
+        document.body.appendChild(form);
+        form.submit();
+        form.remove();
+    });
+</script>
+<!-- wp:heading {"level":3} -->
+<h3 class="wp-block-heading">ご利用にあたって</h3>
+<!-- /wp:heading -->
+<!-- wp:paragraph -->
+<p>・この表は、<a href="https://www.aozora.gr.jp/index_pages/person_all.html">青空文庫</a>の「公開中の作家別作品一覧拡充版：全て（CSV形式、UTF-8、zip圧縮）」をもとに作成しています。</p>
+<!-- /wp:paragraph -->
+<!-- wp:paragraph -->
+<p>・「text」リンクおよび「選択した作品をダウンロード」で提供するテキストは、青空文庫のテキストデータをSJIS（Shift_JIS）からUTF-8に変換しています。</p>
+<!-- /wp:paragraph -->
+<!-- wp:paragraph -->
+<p>・元データにUnicode特有の文字が注釈として埋め込まれている場合は、可能なものについて注釈から文字を取り出し、テキストに反映しています。</p>
+<!-- /wp:paragraph -->
+<!-- wp:paragraph -->
+<p>・上記の加工を行っているため、本サイトで提供するテキストは青空文庫の元データと完全に同一ではありません。</p>
+<!-- /wp:paragraph -->
+<!-- wp:paragraph -->
+<p>・青空文庫の作品には、著作権が消滅した作品のほか、「クリエイティブ・コモンズ 表示 4.0 国際（CC BY 4.0）」のライセンスで提供されている作品があります。後者については、各作品のライセンス条件に従ってご利用ください。</p>
+<!-- /wp:paragraph -->
+<!-- wp:paragraph -->
+<p>・クリエイティブ・コモンズ 表示 4.0 国際（CC BY 4.0）<br><a href="https://creativecommons.org/licenses/by/4.0/deed.ja">https://creativecommons.org/licenses/by/4.0/deed.ja</a></p>
+<!-- /wp:paragraph -->
+<!-- wp:paragraph -->
+<p>・青空文庫<br><a href="https://www.aozora.gr.jp/">https://www.aozora.gr.jp/</a></p>
+<!-- /wp:paragraph -->
+<!-- wp:paragraph -->
+<p></p>
+<!-- /wp:paragraph -->
+</body>
+ <hr>
+<footer>
+  <a href="/">HOME</a>
+  <a href="/aozora_search/ao_fulltext.html">青空文庫全文検索</a>
+</footer>
+</html>

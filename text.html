@@ -1,0 +1,2516 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>青空エディタ</title>
+<style>
+    body {
+        margin: 0;
+        background: #fff;
+        color: #333;
+        font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
+    }
+    /* 設定部分 */
+    #settings {
+        position: sticky;
+        top: 0;
+        background: #fff;
+        border-bottom: 1px solid #ccc;
+        padding: 10px 15px;
+        z-index: 10;
+        font-size: 14px;
+    }
+    #settings label {
+        margin-right: 12px;
+        white-space: nowrap;
+    }
+    #settings .group {
+        display: inline-block;
+        margin-right: 20px;
+        margin-bottom: 5px;
+    }
+    #settings button {
+        margin-right: 5px;
+        padding: 4px 12px;
+        cursor: pointer;
+    }
+    /* 操作ボタン */
+    #buttons {
+        display: inline-block;
+        margin-top: 3px;
+    }
+    #buttons button {
+        font-size: 14px;
+        padding: 5px 12px;
+    }
+    /* 本文 */
+    #text {
+        max-width: 900px;
+        margin: 30px auto;
+        padding: 0 25px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-size: 18px;
+        line-height: 1.8;
+        outline: none;
+    }
+    /* マーク */
+    .marked {
+      background: #ffff66;
+    }
+    #markedList {
+      max-width: 900px;
+      margin: 10px auto;
+      padding: 10px 25px;
+      display: none;
+    }
+    #markedList button {
+      margin: 3px;
+      padding: 5px 10px;
+      font-size: 16px;
+    }
+    .replaced {
+        background-color: #ffff80;
+    }
+    .list-replaced {
+        background-color: #b6e3b6;
+    }
+    /* フォント */
+    #text.gothic {
+        font-family: "Yu Gothic", "Meiryo", sans-serif;
+    }
+    #text.mincho {
+        font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
+    }
+    @font-face {
+        font-family: "みかちゃん";
+        src: url("mikachan.ttf") format("truetype");
+    }
+    #text.mika {
+        font-family: "みかちゃん";
+    }
+    /* 行間 */
+    #text.line-narrow {
+        line-height: 1.4;
+    }
+    #text.line-normal {
+        line-height: 1.8;
+    }
+    #text.line-middle {
+        line-height: 2.2;
+    }
+    /* エラー表示 */
+    #error {
+        color: #c00;
+        margin: 30px;
+    }
+    /* 変換中 */
+    .loading {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 20px;
+        font-size: 16px;
+    }
+    .spinner {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        vertical-align: middle;
+        border: 3px solid #ddd;
+        border-top-color: #666;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+    /* 設定 */
+    #speechSettings {
+        display: none;
+        margin-top: 10px;
+        padding: 12px;
+        border: 1px solid #ccc;
+        background: #f8f8f8;
+    }
+    #speechSettings > div {
+        margin-bottom: 8px;
+    }
+    #speechSettings select {
+        min-width: 220px;
+    }
+    #speechSettings input[type="range"] {
+        width: 500px;
+    }
+    #speechSettings button {
+        margin-top: 5px;
+    }
+    /* スライダー設定 */
+    #progressArea {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+    }
+    #speechProgress {
+        flex: 1;
+    }
+    #speechProgressValue {
+        min-width: 4em;
+        text-align: right;
+    }
+    /* 読み上げモード */
+    #readingModeButtons {
+        display: none;
+        margin-top: 3px;
+    }
+    #readingModeButtons button {
+        font-size: 16px;
+        padding: 6px 14px;
+        margin-right: 5px;
+    }
+</style>
+</head>
+<body>
+<div id="settings">
+    <div class="group">
+        <strong>青空エディタ試験中</strong><br>
+        <div id="toolLinks">
+            <a href="http://pansy.s1010.xrea.com/aozora_search/index.html">
+                青空サーチ
+            </a>
+            |
+            <a href="http://pansy.s1010.xrea.com/aozora_search/ao_fulltext.html">
+                青空文庫全文検索
+            </a>
+        </div>
+    </div>
+    <div id="buttons">
+        <button id="undoButton">↶ UNDO</button>
+        <button id="redoButton">↷ REDO</button>
+        <button id="saveButton">保存</button>
+        <button id="saveAsButton">名前を付けて保存</button>
+        <button id="loadButton">読み込み</button>
+        <input type="file" id="loadFile" accept=".txt" style="display:none">
+        <button id="convertButton">変換</button>
+        <button id="restoreButton">原文に戻す</button>
+        <button id="speakButton">読み上げ</button>
+        <button id="markBtn">マーク</button>
+        <button id="markedListBtn">マーク一覧</button>
+        <button id="replaceBtn">置換</button>
+        <button id="wordRegisterBtn">単語登録</button>
+        <button id="listLoadBtn">リスト読み込み</button>
+        <select id="sampleListSelect">
+            <option value="">サンプルリスト</option>
+            <option value="sample_list/堕落論_list.txt">堕落論</option>
+            <option value="sample_list/実験室の思い出_list.txt">実験室の思い出</option>
+        </select>
+        <button id="listCheckBtn">リスト確認</button>
+        <button id="listReplaceBtn">リスト置換</button>
+        <button id="listSaveBtn">リスト保存</button>
+        <input type="file" id="listFile" accept=".txt" style="display:none">
+        <button id="settingsButton">設定</button>
+    </div>
+    <div id="readingModeButtons">
+        <button id="readingStopButton">停止</button>
+        <button id="readingRewindButton">↶ 巻き戻し</button>
+        <button id="readingReplaceButton">置換</button>
+        <button id="readingExitButton">通常モードへ戻る</button>
+        <span id="wakeLockStatus" role="status" aria-live="polite"></span>
+    </div>
+    <!-- 変換中表示 -->
+    <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <span>ただいま変換中…</span>
+    </div>
+    <div id="speechSettings">
+        <div>
+            <strong>フォント：</strong>
+            <label>
+                <input type="radio" name="font" value="gothic">
+                ゴシック
+            </label>
+            <label>
+                <input type="radio" name="font" value="mincho" checked>
+                明朝
+            </label>
+            <label>
+                <input type="radio" name="font" value="mika">
+                みかちゃん
+            </label>
+        </div>
+        <div>
+            <strong>行間：</strong>
+            <label>
+                <input type="radio" name="line" value="line-narrow">
+                狭い
+            </label>
+            <label>
+                <input type="radio" name="line" value="line-normal" checked>
+                普通
+            </label>
+            <label>
+                <input type="radio" name="line" value="line-middle">
+                広い
+            </label>
+        </div>
+        <div>
+            <strong>ルビ：</strong>
+            <label>
+                <input type="radio" name="ruby" value="keep">
+                保持
+            </label>
+            <label>
+                <input type="radio" name="ruby" value="remove" checked>
+                除去
+            </label>
+            <label>
+                <input type="radio" name="ruby" value="expand">
+                展開
+            </label>
+        </div>
+        <div class="group">
+            <strong>変換１：</strong>
+            <label>
+                <input type="checkbox" id="removeNotes" checked>
+                注釈除去
+            </label>
+            <label>
+                <input type="checkbox" id="convertKanjiNumber">
+                漢数字変換
+            </label>
+        </div>
+        <div>
+            <strong>変換２：</strong>
+            <label>
+                <input type="radio" name="conversion" value="none" checked>
+                変換しない
+            </label>
+            <label>
+                <input type="radio" name="conversion" value="simple">
+                簡易変換
+            </label>
+            <label>
+                <input type="radio" name="conversion" value="kyuuji">
+                旧字変換
+            </label>
+            <label>
+                <input type="radio" name="conversion" value="aozora" id="aozoraConversion">
+                青空変換（PCのみ）
+            </label>
+        </div>
+        <div>
+            <label>
+                読み上げ音声：
+                <select id="voiceSelect"></select>
+            </label>
+        </div>
+        <div>
+            <label>
+                読む速さ：
+                <input type="range" id="speechRate"
+                       min="0.5" max="4.0" step="0.05" value="2.1">
+                <span id="speechRateValue">2.10</span>
+            </label>
+        </div>
+        <div>
+            <label>
+                声の高さ：
+                <input type="range" id="speechPitch"
+                       min="0.5" max="4.0" step="0.05" value="1.0">
+                <span id="speechPitchValue">1.00</span>
+            </label>
+        </div>
+        <div>
+            <label>
+                <input type="checkbox" id="preventSleep" checked>
+                スリープ防止
+            </label>
+        </div>
+        <button id="saveSettings">設定を保存</button>
+        <button id="closeSettings">閉じる</button>
+    </div>
+    <div id="progressArea">
+        <input
+            type="range"
+            id="speechProgress"
+            min="0"
+            max="100"
+            step="0.1"
+            value="0"
+        >
+        <span id="speechProgressValue">0%</span>
+    </div>
+</div>
+<!-- 置換ダイアログ -->
+<div id="replaceDialog" style="
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.3);
+    align-items:center;
+    justify-content:center;
+    z-index:1000;
+">
+    <div style="
+        background:white;
+        padding:20px;
+        width:90%;
+        max-width:500px;
+        box-sizing:border-box;
+        border-radius:8px;
+    ">
+        <div>
+            置換前：
+        </div>
+        <input type="text" id="replaceBefore"
+               style="width:100%; box-sizing:border-box; font-size:1.4em;">
+        <div style="margin-top:10px;">
+            置換後：
+        </div>
+        <input type="text" id="replaceAfter"
+               style="width:100%; box-sizing:border-box; font-size:1.4em;">
+        オプション：
+        <select id="replaceOption">
+          <option value="">なし</option>
+          <option value="s">s</option>
+          <option value="p11">p11</option>
+          <option value="p12">p12</option>
+          <option value="p13">p13</option>
+          <option value="p14">p14</option>
+          <option value="p15">p15</option>
+          <option value="p16">p16</option>
+          <option value="p17">p17</option>
+          <option value="p18">p18</option>
+        </select>
+        <div style="margin-top:15px; text-align:right;">
+            <button id="replaceCancelBtn">キャンセル</button>
+            <button id="replaceOKBtn">ＯＫ</button>
+        </div>
+    </div>
+</div>
+<!-- 置換リスト確認 -->
+<div id="listCheckDialog" style="
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.3);
+    align-items:center;
+    justify-content:center;
+    z-index:1000;
+">
+    <div style="
+        background:white;
+        padding:20px;
+        width:95%;
+        max-width:800px;
+        max-height:90vh;
+        box-sizing:border-box;
+        border-radius:8px;
+        display:flex;
+        flex-direction:column;
+    ">
+        <div id="listCheckFileName"
+             style="margin-bottom:10px; font-weight:bold;">
+        </div>
+        <div style="
+            overflow:auto;
+            flex:1;
+            border:1px solid #ccc;
+        ">
+            <table style="
+                width:100%;
+                border-collapse:collapse;
+                font-size:15px;
+            ">
+                <thead>
+                    <tr>
+                        <th style="border:1px solid #ccc; padding:5px;">
+                            置換前
+                        </th>
+                        <th style="border:1px solid #ccc; padding:5px;">
+                            置換後
+                        </th>
+                        <th style="border:1px solid #ccc; padding:5px; width:80px;">
+                            オプション
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="listCheckBody"></tbody>
+            </table>
+            <h4 style="margin:15px 0 5px;">fオプション（ルビ）</h4>
+            <table style="
+                width:100%;
+                border-collapse:collapse;
+                font-size:15px;
+            ">
+                <thead>
+                    <tr>
+                        <th style="border:1px solid #ccc; padding:5px;">
+                            親文字
+                        </th>
+                        <th style="border:1px solid #ccc; padding:5px;">
+                            ルビ
+                        </th>
+                        <th style="border:1px solid #ccc; padding:5px;">
+                            置換後
+                        </th>
+                        <th style="border:1px solid #ccc; padding:5px; width:80px;">
+                            オプション
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="listCheckFBody"></tbody>
+            </table>
+        </div>
+        <div style="
+            margin-top:15px;
+            display:flex;
+            gap:8px;
+            justify-content:flex-end;
+            flex-wrap:wrap;
+        ">
+            <button id="listDedupBtn">重複除去</button>
+            <button id="listSortBtn">ソート</button>
+            <button id="listOutputBtn">置換リスト出力</button>
+            <button id="listCheckCloseBtn">閉じる</button>
+        </div>
+    </div>
+</div>
+<div id="error"></div>
+<div id="rubyStatus"></div>
+<div id="markedList"></div>
+<div id="text" contenteditable="true">読み込み中……</div>
+<script src="browser.umd.js"></script>
+<script>
+    // =========================================
+    // Ruby / WASM
+    // =========================================
+    let rubyVM = null;
+    let rubyReady = false;
+    let replaceReady = false;
+    let rubyInitPromise = null;
+    let converting = false;
+    // =========================================
+    // Ruby / WASM本体を起動
+    // =========================================
+    async function initRuby() {
+        try {
+            const {
+                DefaultRubyVM
+            } = window["ruby-wasm-wasi"];
+            // ruby.wasmを取得
+            const response = await fetch("ruby+stdlib.wasm");
+            if (!response.ok) {
+                throw new Error(
+                    "ruby.wasmを読み込めませんでした。"
+                );
+            }
+            const buffer =
+                await response.arrayBuffer();
+            const module =
+                await WebAssembly.compile(buffer);
+            const result =
+                await DefaultRubyVM(module);
+            rubyVM = result.vm;
+            // 常時使用するデータを読み込む
+            // data01.rb = 旧字変換
+            const baseFiles = [
+                "data01.rb"
+            ];
+            for (const file of baseFiles) {
+                const response =
+                    await fetch(file);
+                if (!response.ok) {
+                    throw new Error(
+                        file +
+                        "を読み込めませんでした。"
+                    );
+                }
+                const code =
+                    await response.text();
+                console.log(
+                    file + ":",
+                    code.length
+                );
+                rubyVM.eval(code);
+            }
+            // ao_edit.rbは処理だけを定義するので常時読み込む
+            const rubyResponse =
+                await fetch("ao_edit.rb");
+            if (!rubyResponse.ok) {
+                throw new Error(
+                    "ao_edit.rbを読み込めませんでした。"
+                );
+            }
+            const edit =
+                await rubyResponse.text();
+            console.log(
+                "ao_edit.rb:",
+                edit.length
+            );
+            rubyVM.eval(edit);
+            rubyReady = true;
+            console.log("Rubyの準備ができました。");
+        } catch (error) {
+            console.error(error);
+            document.getElementById("error").textContent =
+                "Rubyの初期化に失敗しました：" +
+                error.message;
+            throw error;
+        }
+    }
+    // =========================================
+    // 青空変換用データ読み込み
+    // =========================================
+    async function loadReplaceData() {
+        if (replaceReady) {
+            return;
+        }
+        const rubyStatus = document.getElementById("rubyStatus");
+        rubyStatus.innerHTML =
+            '<span class="spinner"></span> ① 置換データを読み込み中……';
+        // ①をブラウザに一度描画させる
+        await new Promise(resolve =>
+            requestAnimationFrame(resolve)
+        );
+        try {
+            const dataFiles = [
+                "data02.rb"
+            ];
+            await rubyInitPromise;
+            for (const file of dataFiles) {
+                const response = await fetch(file);
+                if (!response.ok) {
+                    throw new Error(
+                        file +
+                        "を読み込めませんでした。"
+                    );
+                }
+                const code = await response.text();
+                rubyStatus.innerHTML =
+                    '<span class="spinner"></span> ② 置換データを展開中……';
+                await new Promise(resolve =>
+                  requestAnimationFrame(() => {
+                    requestAnimationFrame(resolve);
+                  })
+                );
+                rubyVM.eval(code);
+                rubyVM.eval("HAS,TRI,REP02=DATA2");
+            }
+            replaceReady = true;
+            rubyStatus.textContent = "";
+            console.log(
+                "青空変換用置換リストの準備ができました。"
+            );
+        } catch (error) {
+            console.error(error);
+            rubyStatus.textContent = "";
+            errorElement.textContent =
+                "置換リストの読み込みに失敗しました：" +
+                error.message;
+            throw error;
+        }
+    }
+    // Ruby本体を起動
+    rubyInitPromise = initRuby();
+    // URLの ?file= からTXTファイル名を取得
+    const params = new URLSearchParams(location.search);
+    const file = params.get("file");
+    const textElement =
+        document.getElementById("text");
+    const errorElement =
+        document.getElementById("error");
+    const loadingElement =
+        document.getElementById("loading");
+    // =========================================
+    // 自動保存
+    // =========================================
+    let autoSaveTimer = null;
+    // この作品専用の保存場所を作る
+    let autoSaveKey =
+        "aoEditorAutoSave:" +
+        (file || "local");
+    // 編集状態を自動保存
+    function autoSaveText() {
+        const html = textElement.innerHTML;
+        if (!html) {
+            return;
+        }
+        try {
+            localStorage.setItem(
+                autoSaveKey,
+                JSON.stringify({
+                    html: html,
+                    chikanList: chikanList,
+                    time: Date.now()
+                })
+            );
+        } catch (error) {
+            console.error(
+                "自動保存に失敗しました：",
+                error
+            );
+        }
+    }
+    // 文章を変更したら2秒後に自動保存
+    textElement.addEventListener("input", function() {
+        saveHistory();
+        updateUndoRedoButtons();
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = setTimeout(
+            autoSaveText,
+            2000
+        );
+    });
+    // 自動保存されていれば復元する
+    function checkAutoSave() {
+        const saved =
+            localStorage.getItem(autoSaveKey);
+        if (!saved) {
+            return;
+        }
+        try {
+            const data = JSON.parse(saved);
+            if (!data.html) {
+                return;
+            }
+            const date =
+                new Date(data.time);
+            const message =
+                "前回の編集中データがあります。\n\n" +
+                date.toLocaleString() +
+                "\n\n" +
+                "この文章を復元しますか？";
+            if (confirm(message)) {
+                textElement.innerHTML =
+                    data.html;
+                chikanList =
+                    data.chikanList || [];
+                originalText =
+                    textElement.textContent;
+            }
+        } catch (error) {
+            console.error(
+                "自動保存データの読み込みに失敗しました：",
+                error
+            );
+        }
+    }
+    // =========================================
+    // 置換リスト
+    // =========================================
+    let chikanList = [];
+    let chikanFileName = "堕落論_list.txt";    let originalText = "";
+    // =========================================
+    // UNDO / REDO
+    // =========================================
+    const undoStack = [];
+    const redoStack = [];
+    const maxHistory = 20;
+    function getEditorState() {
+        return {
+            html: textElement.innerHTML,
+            chikanList: JSON.parse(
+                JSON.stringify(chikanList)
+            )
+        };
+    }
+    function restoreEditorState(state) {
+        textElement.innerHTML = state.html;
+        chikanList = JSON.parse(
+            JSON.stringify(state.chikanList)
+        );
+    }
+    function saveHistory() {
+        const state = getEditorState();
+        const last =
+            undoStack[undoStack.length - 1];
+        // 同じ状態なら記録しない
+        if (last &&
+            last.html === state.html &&
+            JSON.stringify(last.chikanList) ===
+                JSON.stringify(state.chikanList)) {
+            return;
+        }
+        undoStack.push(state);
+        if (undoStack.length > maxHistory) {
+            undoStack.shift();
+        }
+        redoStack.length = 0;
+    }
+    function updateUndoRedoButtons() {
+        document.getElementById("undoButton").disabled =
+            undoStack.length <= 1;
+        document.getElementById("redoButton").disabled =
+            redoStack.length === 0;
+    }
+    // 原文を保持
+    // =========================================
+    // TXTを読み込む
+    // =========================================
+    if (!file) {
+        textElement.textContent = "";
+        errorElement.textContent =
+            "TXTファイルが指定されていません。";
+    } else {
+        fetch(file)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(
+                        "TXTファイルを読み込めませんでした。"
+                    );
+                }
+                return response.text();
+            })
+            .then(text => {
+                originalText = text;
+                textElement.textContent = text;
+                // 自動保存データがあれば確認
+                checkAutoSave();
+                undoStack.length = 0;
+                redoStack.length = 0;
+                undoStack.push(getEditorState());
+                updateUndoRedoButtons();
+            })
+            .catch(error => {
+                textElement.textContent = "";
+                errorElement.textContent =
+                    error.message;
+            });
+    }
+    // =========================================
+    // フォント変更
+    // =========================================
+    document
+        .querySelectorAll('input[name="font"]')
+        .forEach(radio => {
+            radio.addEventListener("change", function() {
+                textElement.classList.remove(
+                    "gothic",
+                    "mincho",
+                    "mika"
+                );
+                textElement.classList.add(
+                    this.value
+                );
+            });
+        });
+    // =========================================
+    // 行間変更
+    // =========================================
+    document
+        .querySelectorAll('input[name="line"]')
+        .forEach(radio => {
+            radio.addEventListener("change", function() {
+                textElement.classList.remove(
+                    "line-narrow",
+                    "line-normal",
+                    "line-middle"
+                );
+                textElement.classList.add(
+                    this.value
+                );
+            });
+        });
+    // =========================================
+    // 変換
+    // =========================================
+    document
+        .getElementById("convertButton")
+        .addEventListener("click", async function() {
+        if (converting) {
+            return;
+        }
+        converting = true;
+        const convertButton = document.getElementById("convertButton");
+        convertButton.disabled = true;
+            // Ruby / WASMの準備を待つ
+            try {
+                await rubyInitPromise;
+            } catch (error) {
+                converting = false;
+                convertButton.disabled = false;
+                return;
+            }
+            // 現在表示されている本文から処理する
+            let text = textElement.textContent;
+            // ---------------------------------
+            // 注釈除去
+            // ---------------------------------
+            if (
+                document
+                    .getElementById("removeNotes")
+                    .checked
+            ) {
+                // ［＃……］形式の注釈を削除
+                text = text.replace(
+                    /［＃.*?］/g,
+                    ""
+                );
+                // 冒頭の
+                // 「テキスト中に現れる記号について」
+                // を削除
+                text = text.replace(
+                    /-{3,}\r?\n[\s\S]*?-{3,}\r?\n/,
+                    ""
+                );
+            }
+            // ---------------------------------
+            // 漢数字変換
+            // ---------------------------------
+            if (document.getElementById("convertKanjiNumber").checked) {
+                // 変換中表示
+                loadingElement.style.display = "flex";
+                // ブラウザに一度描画させる
+                await new Promise(resolve =>
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(resolve);
+                    })
+                );
+                try {
+                    const rubyText = JSON.stringify(text);
+                    rubyVM.eval(
+                        "$ruby_text = " +
+                        rubyText
+                    );
+                    const result =
+                        rubyVM.eval(
+                            "number_convert($ruby_text)"
+                        );
+                    text = result.toString();
+                } finally {
+                    // 変換終了
+                    loadingElement.style.display =
+                        "none";
+                }
+            }
+            // ---------------------------------
+            // ルビ処理
+            // ---------------------------------
+            const rubyMode =
+                document
+                    .querySelector(
+                        'input[name="ruby"]:checked'
+                    )
+                    .value;
+            if (rubyMode === "remove") {
+                const rubyText =
+                    JSON.stringify(text);
+                rubyVM.eval(
+                    "$ruby_text = " +
+                    rubyText
+                );
+                const result =
+                    rubyVM.eval(
+                        "ruby_remove($ruby_text)"
+                    );
+                text = result.toString();
+            } else if (rubyMode === "expand") {
+                const rubyText =
+                    JSON.stringify(text);
+                rubyVM.eval(
+                    "$ruby_text = " +
+                    rubyText
+                );
+                const result =
+                    rubyVM.eval(
+                        "ruby_expand($ruby_text)"
+                    );
+                text = result.toString();
+            }
+            // ---------------------------------
+            // 変換
+            // ---------------------------------
+            const conversionMode =
+                document.querySelector(
+                    'input[name="conversion"]:checked'
+                ).value;
+            if (conversionMode === "kyuuji") {
+                // 変換中表示
+                loadingElement.style.display = "flex";
+                // ブラウザに一度描画させる
+                await new Promise(resolve =>
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(resolve);
+                    })
+                );
+                try {
+                    // 現在の text をRubyへ渡す
+                    const rubyText =
+                        JSON.stringify(text);
+                    rubyVM.eval(
+                        "$ruby_text = " +
+                        rubyText
+                    );
+                    // 旧字変換
+                    const result =
+                        rubyVM.eval(
+                            "kyuuji($ruby_text)"
+                        );
+                    text = result.toString();
+                } finally {
+                    // 変換終了
+                    loadingElement.style.display =
+                        "none";
+                }
+            } else if (conversionMode === "simple") {
+                // 変換中表示
+                loadingElement.style.display = "flex";
+                // ブラウザに一度描画させる
+                await new Promise(resolve =>
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(resolve);
+                    })
+                );
+                try {
+                    const rubyText = JSON.stringify(text);
+                    rubyVM.eval(
+                        "$ruby_text = " +
+                        rubyText
+                    );
+                    const result =
+                        rubyVM.eval(
+                            "simple_convert($ruby_text)"
+                        );
+                    text = result.toString();
+                } finally {
+                    // 変換終了
+                    loadingElement.style.display =
+                        "none";
+                }
+            } else if (conversionMode === "aozora") {
+                if (!replaceReady) {
+                    await loadReplaceData();
+                }
+                const rubyText = JSON.stringify(text);
+                rubyVM.eval("$ruby_text = " + rubyText);
+                const result = rubyVM.eval(
+                    "ao_convert($ruby_text)"
+                );
+                text = result.toString();
+                const count = (text.match(/✦/g) || []).length;
+                if (count > 0) {
+                    alert(`✦は残り ${count} 個です。`);
+                }
+            }
+            // ---------------------------------
+            // 結果を表示
+            // ---------------------------------
+            textElement.textContent = text;
+            rubyStatus.textContent = "";
+            saveHistory();
+            updateUndoRedoButtons();
+            converting = false;
+            convertButton.disabled = false;
+        });
+    // =========================================
+    // 原文に戻す
+    // =========================================
+    document
+        .getElementById("restoreButton")
+        .addEventListener("click", function() {
+            textElement.textContent =
+                originalText;
+            saveHistory();
+            updateUndoRedoButtons();
+            autoSaveText();
+        });
+    // =========================================
+    // UNDO
+    // =========================================
+    document
+        .getElementById("undoButton")
+        .addEventListener("click", function() {
+            if (undoStack.length <= 1) {
+                return;
+            }
+            const current =
+                undoStack.pop();
+            redoStack.push(current);
+            const previous =
+                undoStack[undoStack.length - 1];
+            restoreEditorState(previous);
+            updateUndoRedoButtons();
+            autoSaveText();
+        });
+    // =========================================
+    // REDO
+    // =========================================
+    document
+        .getElementById("redoButton")
+        .addEventListener("click", function() {
+            if (redoStack.length === 0) {
+                return;
+            }
+            const state =
+                redoStack.pop();
+            undoStack.push(state);
+            restoreEditorState(state);
+            updateUndoRedoButtons();
+            autoSaveText();
+        });
+    // =========================================
+    // 読み上げ
+    // =========================================
+    let speaking = false;
+    let wakeLock = null;
+    let wakeLockRequest = null;
+    let wakeLockRetryTimer = null;
+    // HTTP接続用の動画フォールバック
+    let sleepVideo = null;
+    let sleepVideoStream = null;
+    // 発話を識別する番号
+    let speechSession = 0;
+    // =========================================
+    // 読み上げ位置スライダー
+    // =========================================
+    const speechProgress =
+        document.getElementById("speechProgress");
+    const speechProgressValue =
+        document.getElementById("speechProgressValue");
+    // 現在の読み上げ位置
+    let speechPosition = 0;
+    // 現在読み上げている文章の先頭
+    let currentSpeechStart = 0;
+    // スライダーを現在位置に合わせる
+    function updateSpeechProgress(position) {
+        const text = textElement.textContent;
+        if (!text.length) {
+            speechProgress.value = 0;
+            speechProgressValue.textContent = "0%";
+            return;
+        }
+        const percent = position / text.length * 100;
+        speechProgress.value = percent;
+        speechProgressValue.textContent =
+            percent.toFixed(1) + "%";
+    }
+    // カーソルの移動にスライダーを追随させる
+    document.addEventListener("selectionchange", function() {
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0) return;
+        const node = sel.focusNode;
+        if (!node || !textElement.contains(node)) return;
+        const range = document.createRange();
+        range.selectNodeContents(textElement);
+        range.setEnd(node, sel.focusOffset);
+        const position = range.toString().length;
+        speechPosition = position;
+        updateSpeechProgress(position);
+    });
+    // 選択部をマークする
+    document.getElementById("markBtn").addEventListener("click", function() {
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+            return;
+        }
+        const range = sel.getRangeAt(0);
+        if (!textElement.contains(range.commonAncestorContainer)) {
+            return;
+        }
+        const span = document.createElement("span");
+        span.className = "marked";
+        try {
+            range.surroundContents(span);
+        } catch(e) {
+            alert("この範囲にはマークできません。");
+            return;
+        }
+        sel.removeAllRanges();
+    });
+    // マーク一覧
+    document.getElementById("markedListBtn").addEventListener("click", function() {
+        const marked = [...document.querySelectorAll("#text .marked")]
+            .map(el => el.textContent);
+        const unique = [...new Set(marked)];
+        const list = document.getElementById("markedList");
+        list.innerHTML = "";
+        if (unique.length === 0) {
+            list.textContent = "マークされた文字はありません。";
+            list.style.display = "block";
+            return;
+        }
+        unique.forEach(function(word) {
+            const button = document.createElement("button");
+            button.textContent = word;
+            button.addEventListener("click", function() {
+                document.getElementById("replaceBefore").value = word;
+                document.getElementById("replaceAfter").value = word;
+                document.getElementById("replaceOption").value = "";
+                document.getElementById("replaceDialog").style.display = "flex";
+                document.getElementById("replaceBefore").focus();
+                list.style.display = "none";
+            });
+            list.appendChild(button);
+        });
+        list.style.display = "block";
+    });
+    // 置換ダイアログ「キャンセル」
+    document.getElementById("replaceCancelBtn")
+        .addEventListener("click", function() {
+            document.getElementById("replaceDialog").style.display = "none";
+        });
+    // 置換とマーク
+    function replaceAndMark(before, after) {
+        if (before === "") {
+            return 0;
+        }
+        const walker = document.createTreeWalker(
+            textElement,
+            NodeFilter.SHOW_TEXT
+        );
+        const nodes = [];
+        let node;
+        while (node = walker.nextNode()) {
+            nodes.push(node);
+        }
+        let count = 0;
+        nodes.forEach(function(node) {
+            if (!node.nodeValue.includes(before)) {
+                return;
+            }
+            const parent = node.parentElement;
+            if (parent && parent.closest(".replaced")) {
+                return;
+            }
+            const parts = node.nodeValue.split(before);
+            if (parts.length === 1) {
+                return;
+            }
+            const fragment = document.createDocumentFragment();
+            parts.forEach(function(part, i) {
+                if (i > 0) {
+                    const span = document.createElement("span");
+                    span.className = "replaced";
+                    span.textContent = after;
+                    fragment.appendChild(span);
+                    count++;
+                }
+                if (part !== "") {
+                    fragment.appendChild(
+                        document.createTextNode(part)
+                    );
+                }
+            });
+            node.parentNode.replaceChild(fragment, node);
+        });
+        return count;
+    }
+    // 置換ダイアログ「ＯＫ」
+    document.getElementById("replaceOKBtn")
+        .addEventListener("click", function() {
+            const before = document.getElementById("replaceBefore").value;
+            const after = document.getElementById("replaceAfter").value;
+            const option = document.getElementById("replaceOption").value;
+            if (before === "") {
+                return;
+            }
+            replaceAndMark(before, after);
+            const row = [before, after];
+            if (option !== "") {
+                row.push(option);
+            }
+            chikanList.push(row);
+            autoSaveText();
+            document.getElementById("replaceDialog").style.display = "none";
+        });
+    // 置換ボタン
+    document.getElementById("replaceBtn").addEventListener("click", function() {
+        const selected = window.getSelection().toString();
+        if (selected === "") {
+            alert("置換する文字を選択してください。");
+            return;
+        }
+        document.getElementById("replaceBefore").value = selected;
+        document.getElementById("replaceAfter").value = selected;
+        document.getElementById("replaceOption").value = "";
+        document.getElementById("replaceDialog").style.display = "flex";
+        document.getElementById("replaceBefore").focus();
+    });
+    // =========================================
+    // 置換リストに単語を登録
+    // =========================================
+    document.getElementById("wordRegisterBtn")
+        .addEventListener("click", function() {
+            const before = prompt("置換前の文字を入力してください。");
+            if (before === null || before === "") {
+                return;
+            }
+            const after = prompt(
+                "「" + before + "」を何に置き換えますか？"
+            );
+            if (after === null) {
+                return;
+            }
+            const option = prompt(
+                "オプションを入力してください。\n" +
+                "例：p16、p17、s\n" +
+                "何も指定しない場合は空欄",
+                ""
+            );
+            if (option === null) {
+                return;
+            }
+            const row = [before, after];
+            if (option !== "") {
+                row.push(option);
+            }
+            chikanList.push(row);
+            autoSaveText();
+            alert("置換リストに登録しました。");
+        });
+        // =========================================
+        // リスト置換
+        // =========================================
+        document.getElementById("listReplaceBtn")
+            .addEventListener("click", async function() {
+                if (chikanList.length === 0) {
+                    alert("置換リストがありません。");
+                    return;
+                }
+                await rubyInitPromise;
+                const text = textElement.innerText;
+                const rubyText = JSON.stringify(text);
+                const rubyList = JSON.stringify(chikanList);
+                try {
+                    rubyVM.eval("$ruby_text = " + rubyText);
+                    rubyVM.eval("$chikan_list = " + rubyList);
+                    let result = rubyVM.eval(
+                        "list_replace($ruby_text, $chikan_list)"
+                    ).toString();
+                    textElement.innerHTML = "";
+                    const parts = result.split(/(✦.*?✧)/s);
+                    parts.forEach(function(part) {
+                        if (part.startsWith("✦") &&
+                            part.endsWith("✧")) {
+                            const span = document.createElement("span");
+                            span.className = "list-replaced";
+                            span.textContent = part.slice(1, -1);
+                            textElement.appendChild(span);
+                        } else {
+                            textElement.appendChild(
+                                document.createTextNode(part)
+                            );
+                        }
+                    });
+                    saveHistory();
+                    updateUndoRedoButtons();
+                    autoSaveText();
+                    alert("リスト置換が完了しました。");
+                } catch (e) {
+                    console.error(e);
+                    alert("リスト置換でエラーが発生しました。");
+                }
+            });
+        // =========================================
+        // テキストを解析して置換リストに入れる
+        // =========================================
+        function loadChikanListText(text, fileName) {
+            const lines = text.split(/\r?\n/);
+            chikanList = [];
+            lines.forEach(function(line) {
+                if (!line.trim()) {
+                    return;
+                }
+                const fields = line.split(",");
+                fields[0] = fields[0].replace(/^\uFEFF/, "");
+                if (fields.length < 2) {
+                    return;
+                }
+                const row = [
+                    fields[0],
+                    fields[1]
+                ];
+                if (fields.length >= 3 &&
+                    fields[2] !== "") {
+                    row.push(fields[2]);
+                }
+                if (fields.length >= 4 &&
+                    fields[3] !== "") {
+                    row.push(fields[3]);
+                }
+                chikanList.push(row);
+            });
+            chikanFileName = fileName;
+            alert(
+                chikanFileName +
+                "を読み込みました。\n" +
+                chikanList.length +
+                "件"
+            );
+        }
+        // =========================================
+        // 置換リスト読み込み
+        // =========================================
+        const listFile =
+            document.getElementById("listFile");
+        document.getElementById("listLoadBtn")
+            .addEventListener("click", function() {
+                listFile.click();
+            });
+        listFile.addEventListener("change", function() {
+            const file = this.files[0];
+            if (!file) {
+                return;
+            }
+            if (!file.name.endsWith("_list.txt")) {
+                alert("置換リスト（*_list.txt）を選択してください。");
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function() {
+                loadChikanListText(
+                    reader.result,
+                    file.name
+                );
+            };
+            reader.readAsText(file, "UTF-8");
+            // 同じファイルをもう一度選べるようにする
+            this.value = "";
+        });
+        document.getElementById("sampleListSelect")
+            .addEventListener("change", async function() {
+                const url = this.value;
+                if (!url) {
+                    return;
+                }
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        throw new Error(
+                            "HTTP " + response.status
+                        );
+                    }
+                    const text = await response.text();
+                    const fileName =
+                        decodeURIComponent(
+                            url.split("/").pop()
+                        );
+                    loadChikanListText(
+                        text,
+                        fileName
+                    );
+                } catch (e) {
+                    console.error(e);
+                    alert(
+                        "サンプルリストを読み込めませんでした。\n" +
+                        e.message
+                    );
+                }
+                // 次回も同じ項目を選べるようにする
+                this.value = "";
+            });
+        // =========================================
+        // 置換リスト確認
+        // =========================================
+        const listCheckDialog =
+            document.getElementById("listCheckDialog");
+        const listCheckBody =
+            document.getElementById("listCheckBody");
+        const listCheckFileName =
+            document.getElementById("listCheckFileName");
+        function updateListCheck() {
+            listCheckBody.innerHTML = "";
+            listCheckFBody.innerHTML = "";
+            listCheckFileName.textContent =
+                "ファイル名：" + chikanFileName;
+            // Rubyで並べ替え
+            rubyVM.eval("$chikan_list = " + JSON.stringify(chikanList));
+            rubyVM.eval("list_sort($chikan_list)");
+            // Ruby側で作った並べ替え結果を取得
+            const fText = rubyVM.eval("$list_sort_f").toString();
+            const normalText = rubyVM.eval("$list_sort_normal").toString();
+            // fオプション
+            if (fText) {
+                fText.split("\n").forEach(function(line) {
+                    if (!line) return;
+                    const row = line.split(",");
+                    const tr = document.createElement("tr");
+                    const tdParent = document.createElement("td");
+                    tdParent.textContent = row[0] || "";
+                    tdParent.style.border = "1px solid #ccc";
+                    tdParent.style.padding = "4px";
+                    const tdRuby = document.createElement("td");
+                    tdRuby.textContent = row[1] || "";
+                    tdRuby.style.border = "1px solid #ccc";
+                    tdRuby.style.padding = "4px";
+                    const tdAfter = document.createElement("td");
+                    tdAfter.textContent =
+                        row.length >= 4 ? (row[2] || "") : "";
+                    tdAfter.style.border = "1px solid #ccc";
+                    tdAfter.style.padding = "4px";
+                    const tdOption = document.createElement("td");
+                    tdOption.textContent = "f";
+                    tdOption.style.border = "1px solid #ccc";
+                    tdOption.style.padding = "4px";
+                    tr.appendChild(tdParent);
+                    tr.appendChild(tdRuby);
+                    tr.appendChild(tdAfter);
+                    tr.appendChild(tdOption);
+                    listCheckFBody.appendChild(tr);
+                });
+            }
+            // 通常の置換
+            if (normalText) {
+                normalText.split("\n").forEach(function(line) {
+                    if (!line) return;
+                    const row = line.split(",");
+                    const tr = document.createElement("tr");
+                    const tdBefore = document.createElement("td");
+                    tdBefore.textContent = row[0] || "";
+                    tdBefore.style.border = "1px solid #ccc";
+                    tdBefore.style.padding = "4px";
+                    const tdAfter = document.createElement("td");
+                    tdAfter.textContent = row[1] || "";
+                    tdAfter.style.border = "1px solid #ccc";
+                    tdAfter.style.padding = "4px";
+                    const tdOption = document.createElement("td");
+                    tdOption.textContent = row[2] || "";
+                    tdOption.style.border = "1px solid #ccc";
+                    tdOption.style.padding = "4px";
+                    tr.appendChild(tdBefore);
+                    tr.appendChild(tdAfter);
+                    tr.appendChild(tdOption);
+                    listCheckBody.appendChild(tr);
+                });
+            }
+        }
+        // リスト確認
+        document.getElementById("listCheckBtn")
+            .addEventListener("click", function() {
+                updateListCheck();
+                listCheckDialog.style.display = "flex";
+            });
+        // 閉じる
+        document.getElementById("listCheckCloseBtn")
+            .addEventListener("click", function() {
+                listCheckDialog.style.display = "none";
+            });
+        // 重複除去
+        document.getElementById("listDedupBtn")
+            .addEventListener("click", function() {
+                const beforeCount = chikanList.length;
+                const seen = new Set();
+                chikanList = chikanList.filter(function(row) {
+                    const key = JSON.stringify(row);
+                    if (seen.has(key)) {
+                        return false;
+                    }
+                    seen.add(key);
+                    return true;
+                });
+                const removed =
+                    beforeCount - chikanList.length;
+                updateListCheck();
+                alert(
+                    removed +
+                    "件の重複を除去しました。"
+                );
+            });
+        // ソート
+        document.getElementById("listSortBtn")
+            .addEventListener("click", function() {
+                const optionOrder = [
+                    "s",
+                    "",
+                    "p11",
+                    "p12",
+                    "p13",
+                    "p14",
+                    "p15",
+                    "p16",
+                    "p17",
+                    "p18"
+                ];
+                chikanList.sort(function(a, b) {
+                    const ao = optionOrder.indexOf(a[2] || "");
+                    const bo = optionOrder.indexOf(b[2] || "");
+                    const aOrder =
+                        ao === -1 ? optionOrder.length : ao;
+                    const bOrder =
+                        bo === -1 ? optionOrder.length : bo;
+                    if (aOrder !== bOrder) {
+                        return aOrder - bOrder;
+                    }
+                    return (b[0] || "").length -
+                           (a[0] || "").length;
+                });
+                updateListCheck();
+            });
+        // 出力ファイル名を作る
+        function makeListOutputFileName() {
+            const match =
+                chikanFileName.match(/_(\d+)_list\.txt$/);
+            if (match) {
+                const number =
+                    Number(match[1]) + 1;
+                const digits =
+                    String(number).padStart(3, "0");
+                return chikanFileName.replace(
+                    /_(\d+)_list\.txt$/, //
+                    "_" + digits + "_list.txt"
+                );
+            }
+            if (chikanFileName.endsWith("_list.txt")) {
+                return chikanFileName.replace(
+                    /_list\.txt$/, //
+                    "_001_list.txt"
+                );
+            }
+            return "置換リスト_001_list.txt";
+        }
+        // 置換リスト出力
+        document.getElementById("listOutputBtn")
+            .addEventListener("click", async function() {
+                if (chikanList.length === 0) {
+                    alert("出力する置換リストがありません。");
+                    return;
+                }
+                const filename =
+                    makeListOutputFileName();
+                const text =
+                    chikanList.map(function(row) {
+                        return row.join(",");
+                    }).join("\n");
+                // UTF-8 BOM
+                const bom = new Uint8Array([
+                    0xEF,
+                    0xBB,
+                    0xBF
+                ]);
+                const blob = new Blob(
+                    [bom, text],
+                    {type: "text/plain;charset=utf-8"}
+                );
+                if (window.showSaveFilePicker) {
+                    try {
+                        const handle =
+                            await window.showSaveFilePicker({
+                                suggestedName: filename,
+                                types: [{
+                                    description: "テキストファイル",
+                                    accept: {
+                                        "text/plain": [".txt"]
+                                    }
+                                }]
+                            });
+                        const writable =
+                            await handle.createWritable();
+                        await writable.write(blob);
+                        await writable.close();
+                        // 次回の連番の基準を更新
+                        chikanFileName = filename;
+                        alert(
+                            filename +
+                            "として保存しました。"
+                        );
+                        return;
+                    } catch (error) {
+                        if (error.name === "AbortError") {
+                            return;
+                        }
+                        console.log(
+                            "ファイル保存ダイアログを使用できません：",
+                            error
+                        );
+                    }
+                }
+                // 非対応ブラウザ用
+                const url =
+                    URL.createObjectURL(blob);
+                const a =
+                    document.createElement("a");
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(function() {
+                    URL.revokeObjectURL(url);
+                }, 1000);
+                // 次回の連番の基準を更新
+                chikanFileName = filename;
+            });
+        // =========================================
+        // 置換リスト保存
+        // =========================================
+        document.getElementById("listSaveBtn")
+            .addEventListener("click", async function() {
+                if (chikanList.length === 0) {
+                    alert("保存する置換リストがありません。");
+                    return;
+                }
+                const csv = chikanList
+                    .map(row => row.join(","))
+                    .join("\n");
+                const bom = new Uint8Array([
+                    0xEF, 0xBB, 0xBF
+                ]);
+                const blob = new Blob(
+                    [
+                        bom,
+                        chikanList.map(function(row) {
+                            return row.join(",");
+                        }).join("\n")
+                    ],
+                    {type: "text/plain;charset=utf-8"}
+                );
+                if (window.showSaveFilePicker) {
+                    try {
+                        const handle =
+                            await window.showSaveFilePicker({
+                                suggestedName: chikanFileName,
+                                types: [{
+                                    description: "テキストファイル",
+                                    accept: {"text/plain": [".txt"]}
+                                }]
+                            });
+                        const writable =
+                            await handle.createWritable();
+                        await writable.write(blob);
+                        await writable.close();
+                        return;
+                    } catch (error) {
+                        if (error.name === "AbortError") {
+                            return;
+                        }
+                        console.log(
+                            "TXT保存ダイアログを使用できません：",
+                            error
+                        );
+                    }
+                }
+                const url =
+                    URL.createObjectURL(blob);
+                const a =
+                    document.createElement("a");
+                a.href = url;
+                a.download = chikanFileName;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(function() {
+                    URL.revokeObjectURL(url);
+                }, 1000);
+            });
+    // 画面スリープを防止
+    function scheduleWakeLockRetry() {
+        if (wakeLockRetryTimer !== null) {
+            return;
+        }
+        wakeLockRetryTimer = setTimeout(function() {
+            wakeLockRetryTimer = null;
+            requestWakeLock();
+        }, 5000);
+    }
+    // HTTPSでない場合の代替策。ユーザー操作中に無音の動画を再生する。
+    // Androidブラウザで動画再生中の画面消灯を抑える仕組みを利用する。
+    function startSleepVideo() {
+        if (!sleepVideo) {
+            if (!HTMLCanvasElement.prototype.captureStream) {
+                return Promise.reject(
+                    new Error("このブラウザは動画フォールバックに対応していません。")
+                );
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = 2;
+            canvas.height = 2;
+            const context = canvas.getContext("2d");
+            context.fillStyle = "black";
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            sleepVideoStream = canvas.captureStream(1);
+
+            sleepVideo = document.createElement("video");
+            sleepVideo.muted = true;
+            sleepVideo.playsInline = true;
+            sleepVideo.setAttribute("playsinline", "");
+            sleepVideo.setAttribute("aria-hidden", "true");
+            sleepVideo.tabIndex = -1;
+            sleepVideo.disablePictureInPicture = true;
+            sleepVideo.srcObject = sleepVideoStream;
+            sleepVideo.style.cssText =
+                "position:fixed;width:1px;height:1px;left:0;bottom:0;" +
+                "opacity:0.01;pointer-events:none;z-index:0;";
+            document.body.appendChild(sleepVideo);
+        }
+        // この関数は読み上げボタン／再生ボタンの操作から呼び出し、
+        // モバイルブラウザのユーザー操作要件を満たす。
+        return sleepVideo.play();
+    }
+    function stopSleepVideo() {
+        if (sleepVideo) {
+            sleepVideo.pause();
+            sleepVideo.srcObject = null;
+            sleepVideo.remove();
+            sleepVideo = null;
+        }
+        if (sleepVideoStream) {
+            sleepVideoStream.getTracks().forEach(function(track) {
+                track.stop();
+            });
+            sleepVideoStream = null;
+        }
+    }
+    async function requestWakeLock() {
+        const status = document.getElementById("wakeLockStatus");
+        if (
+            !speaking ||
+            !document.getElementById("preventSleep").checked ||
+            document.visibilityState !== "visible"
+        ) {
+            return;
+        }
+        if (!("wakeLock" in navigator)) {
+            try {
+                await startSleepVideo();
+                status.textContent = "動画によるスリープ防止中";
+            } catch (err) {
+                console.log("動画フォールバックの開始失敗:", err);
+                status.textContent = "動画によるスリープ防止を開始できません。";
+            }
+            return;
+        }
+        if (wakeLock && !wakeLock.released) {
+            return;
+        }
+        if (wakeLockRequest) {
+            return wakeLockRequest;
+        }
+        try {
+            wakeLockRequest = navigator.wakeLock.request("screen");
+            const requestedLock = await wakeLockRequest;
+            // 取得待ちの間に停止・非表示・設定変更された場合は保持しない
+            if (
+                !speaking ||
+                !document.getElementById("preventSleep").checked ||
+                document.visibilityState !== "visible"
+            ) {
+                await requestedLock.release();
+                return;
+            }
+            wakeLock = requestedLock;
+            status.textContent = "スリープ防止中";
+            requestedLock.addEventListener("release", function() {
+                if (wakeLock === requestedLock) {
+                    wakeLock = null;
+                    if (
+                        speaking &&
+                        document.visibilityState === "visible" &&
+                        document.getElementById("preventSleep").checked
+                    ) {
+                        status.textContent = "スリープ防止を再取得しています…";
+                        scheduleWakeLockRetry();
+                    }
+                }
+            });
+            console.log("Wake Lock取得");
+        } catch (err) {
+            console.log("Wake Lock取得失敗:", err);
+            // APIが拒否された場合も、ユーザー操作からの代替再生を試す
+            try {
+                await startSleepVideo();
+                status.textContent = "動画によるスリープ防止中";
+            } catch (fallbackError) {
+                console.log("動画フォールバックの開始失敗:", fallbackError);
+                status.textContent = "スリープ防止を取得できません。HTTPS接続をお試しください。";
+                scheduleWakeLockRetry();
+            }
+        } finally {
+            wakeLockRequest = null;
+        }
+    }
+    // 画面スリープ防止を解除
+    function releaseWakeLock() {
+        if (wakeLockRetryTimer !== null) {
+            clearTimeout(wakeLockRetryTimer);
+            wakeLockRetryTimer = null;
+        }
+        if (wakeLock) {
+            wakeLock.release().catch(function(err) {
+                console.log("Wake Lock解除失敗:", err);
+            });
+            wakeLock = null;
+        }
+        stopSleepVideo();
+        document.getElementById("wakeLockStatus").textContent = "";
+    }
+    // 非表示中はブラウザがWake Lockを解除するため、復帰時に取り直す
+    document.addEventListener("visibilitychange", function() {
+        if (document.visibilityState === "visible" && speaking) {
+            requestWakeLock();
+        }
+    });
+    // 設定画面でスリープ防止を解除した場合は、保持中のWake Lockも解除
+    document.getElementById("preventSleep")
+        .addEventListener("change", function() {
+            if (this.checked && speaking) {
+                requestWakeLock();
+            } else {
+                releaseWakeLock();
+            }
+        });
+    // 文字位置 start ～ end を実際に選択する
+    function selectText(start, end) {
+        const sel = window.getSelection();
+        const range = document.createRange();
+        const walker = document.createTreeWalker(
+            textElement,
+            NodeFilter.SHOW_TEXT
+        );
+        let node;
+        let pos = 0;
+        let startNode = null;
+        let startOffset = 0;
+        let endNode = null;
+        let endOffset = 0;
+        while (node = walker.nextNode()) {
+            const nextPos = pos + node.nodeValue.length;
+            if (!startNode && start >= pos && start <= nextPos) {
+                startNode = node;
+                startOffset = start - pos;
+            }
+            if (end >= pos && end <= nextPos) {
+                endNode = node;
+                endOffset = end - pos;
+                break;
+            }
+            pos = nextPos;
+        }
+        if (!startNode || !endNode) {
+            return false;
+        }
+        range.setStart(startNode, startOffset);
+        range.setEnd(endNode, endOffset);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        return true;
+    }
+    // 次の一文を読み上げる
+    function speakNext(start) {
+        const text = textElement.textContent;
+        // 現在のセッション番号を取得
+        const session = speechSession;
+        // 現在読み上げている文章の先頭を保存
+        currentSpeechStart = start;
+        // 現在位置を保存
+        speechPosition = start;
+        updateSpeechProgress(start);
+        // 最後まで来た
+        if (start >= text.length) {
+            speaking = false;
+            readingStopButton.textContent = "再生";
+            releaseWakeLock();
+            return;
+        }
+        // 次の区切り文字を探す
+        let match = text.slice(start).match(
+            /。|！|？|――。?|……。?|\n/
+        );
+        let end;
+        if (match) {
+            end = start + match.index + match[0].length;
+        } else {
+            end = text.length;
+        }
+        // 一文を取り出す
+        const sentence = text.slice(start, end);
+        // 空白だけなら次へ
+        if (!sentence.trim()) {
+            speakNext(end);
+            return;
+        }
+        // 一文を選択
+        if (!selectText(start, end)) {
+            speaking = false;
+            readingStopButton.textContent = "再生";
+            releaseWakeLock();
+            return;
+        }
+        // 選択箇所を画面中央付近へ
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+            const rect =
+                selection.getRangeAt(0).getBoundingClientRect();
+            if (
+                rect.top < 150 ||
+                rect.bottom > window.innerHeight - 150
+            ) {
+                window.scrollBy({
+                    top: rect.top - window.innerHeight / 2,
+                    behavior: "smooth"
+                });
+            }
+        }
+        // 読み上げ
+        const utterance =
+            new SpeechSynthesisUtterance(sentence);
+        utterance.lang = "ja-JP";
+        utterance.rate =
+            Number(
+                document.getElementById("speechRate").value
+            );
+        utterance.pitch =
+            Number(
+                document.getElementById("speechPitch").value
+            );
+        // 読み上げ終了
+        utterance.onend = function() {
+            // 古い発話なら何もしない
+            if (session !== speechSession) {
+                return;
+            }
+            if (speaking) {
+                speakNext(end);
+            } else {
+                releaseWakeLock();
+            }
+        };
+        speechSynthesis.speak(utterance);
+    }
+    // =========================================
+    // 読み上げモード
+    // =========================================
+    let readingMode = false;
+    const buttons = document.getElementById("buttons");
+    const readingModeButtons =
+        document.getElementById("readingModeButtons");
+    const readingStopButton =
+        document.getElementById("readingStopButton");
+    const readingRewindButton =
+        document.getElementById("readingRewindButton");
+    const readingReplaceButton =
+        document.getElementById("readingReplaceButton");
+    const readingExitButton =
+        document.getElementById("readingExitButton");
+    function enterReadingMode() {
+        readingMode = true;
+        buttons.style.display = "none";
+        readingModeButtons.style.display = "block";
+    }
+    function exitReadingMode() {
+        readingMode = false;
+        if (speaking) {
+            speaking = false;
+            speechSynthesis.cancel();
+            releaseWakeLock();
+        }
+        buttons.style.display = "inline-block";
+        readingModeButtons.style.display = "none";
+    }
+    // 読み上げモード「停止／再生」
+    readingStopButton.addEventListener("click", function() {
+        // 再生中 → 停止
+        if (speaking) {
+            speaking = false;
+            // 現在の発話を無効化
+            speechSession++;
+            speechSynthesis.cancel();
+            releaseWakeLock();
+            readingStopButton.textContent = "再生";
+            return;
+        }
+        // 停止中 → 現在の文章から再生
+        speechSession++;
+        speaking = true;
+        requestWakeLock();
+        readingStopButton.textContent = "停止";
+        speakNext(currentSpeechStart);
+    });
+    // 読み上げモード「巻き戻し」
+    readingRewindButton.addEventListener("click", function() {
+        const text = textElement.textContent;
+        const pos = currentSpeechStart;
+        if (pos <= 0) {
+            return;
+        }
+        const re =
+            /。|！|？|――。?|……。?|\n/g;
+        let previousStart = 0;
+        let match;
+        while ((match = re.exec(text)) !== null) {
+            const end =
+                match.index + match[0].length;
+            if (end >= pos) {
+                break;
+            }
+            previousStart = end;
+        }
+        // 現在の発話を無効化
+        speechSession++;
+        speaking = false;
+        speechSynthesis.cancel();
+        releaseWakeLock();
+        // 前の文章から読み直す
+        setTimeout(function() {
+            speechSession++;
+            speaking = true;
+            requestWakeLock();
+            readingStopButton.textContent = "停止";
+            speakNext(previousStart);
+        }, 0);
+    });
+    // 読み上げモード「置換」
+    readingReplaceButton.addEventListener("click", function() {
+        document.getElementById("replaceBtn").click();
+    });
+    // 読み上げモード「通常モードへ戻る」
+    readingExitButton.addEventListener("click", function() {
+        exitReadingMode();
+    });
+    // 読み上げボタン
+    document.getElementById("speakButton").addEventListener("click", function() {
+        // 読み上げモードへ入る
+        enterReadingMode();
+        // すでに読み上げ中なら停止
+        if (speaking) {
+            speaking = false;
+            speechSynthesis.cancel();
+            releaseWakeLock();
+            return;
+        }
+        const sel = window.getSelection();
+        let start = speechPosition;
+        // カーソルが本文中にある場合
+        if (sel && sel.rangeCount > 0) {
+            const startNode = sel.focusNode;
+            const startOffset = sel.focusOffset;
+            // カーソルが本文の中にあるか確認
+            if (startNode && textElement.contains(startNode)) {
+                // 本文の先頭からカーソルまでの文字数を調べる
+                const beforeRange = document.createRange();
+                beforeRange.selectNodeContents(textElement);
+                beforeRange.setEnd(startNode, startOffset);
+                start = beforeRange.toString().length;
+            }
+        }
+        // 読み上げ開始
+        speechSynthesis.cancel();
+        speaking = true;
+        requestWakeLock();
+        speakNext(start);
+        // 読み上げ開始後にキーボードを閉じる
+        setTimeout(() => {
+            if (document.activeElement) {
+                document.activeElement.blur();
+            }
+        }, 100);
+    });
+    // =========================================
+    // 読み上げ設定
+    // =========================================
+    const voiceSelect = document.getElementById("voiceSelect");
+    let savedVoiceName = null;
+    function loadVoices() {
+      const voices = speechSynthesis.getVoices();
+      voiceSelect.innerHTML = "";
+      voices
+        .filter(v => v.lang.startsWith("ja"))
+        .forEach(v => {
+          const option = document.createElement("option");
+          option.value = v.name;
+          option.textContent = v.name;
+          voiceSelect.appendChild(option);
+        });
+      if (savedVoiceName) {
+        const option =
+          [...voiceSelect.options]
+            .find(o => o.value === savedVoiceName);
+        if (option) {
+          voiceSelect.value = savedVoiceName;
+        }
+      }
+    }
+    speechSynthesis.onvoiceschanged = loadVoices;
+    loadVoices();
+    const speechRate = document.getElementById("speechRate");
+    const speechRateValue = document.getElementById("speechRateValue");
+    speechRate.addEventListener("input", function() {
+        speechRateValue.textContent = Number(this.value).toFixed(2);
+    });
+    const speechPitch = document.getElementById("speechPitch");
+    const speechPitchValue = document.getElementById("speechPitchValue");
+    speechPitch.addEventListener("input", function() {
+        speechPitchValue.textContent = Number(this.value).toFixed(2);
+    });
+    speechRateValue.textContent = Number(speechRate.value).toFixed(2);
+    speechPitchValue.textContent = Number(speechPitch.value).toFixed(2);
+    // =========================================
+    // 設定ボタン
+    // =========================================
+    document.getElementById("settingsButton").addEventListener("click", function() {
+        const settings = document.getElementById("speechSettings");
+        if (settings.style.display === "block") {
+            settings.style.display = "none";
+        } else {
+            settings.style.display = "block";
+        }
+    });
+    document.getElementById("closeSettings").addEventListener("click", async function() {
+        document.getElementById("speechSettings").style.display = "none";
+        const conversionMode =
+            document.querySelector(
+                'input[name="conversion"]:checked'
+            ).value;
+        if (
+            conversionMode === "aozora" &&
+            !replaceReady
+        ) {
+            await loadReplaceData();
+        }
+    });
+    // =========================================
+    // 設定の保存
+    // =========================================
+    document.getElementById("saveSettings")
+        .addEventListener("click", function() {
+            const settings = {
+                font:
+                    document.querySelector(
+                        'input[name="font"]:checked'
+                    ).value,
+                line:
+                    document.querySelector(
+                        'input[name="line"]:checked'
+                    ).value,
+                removeNotes:
+                    document.getElementById("removeNotes").checked,
+                convertKanjiNumber:
+                    document.getElementById("convertKanjiNumber").checked,
+                ruby:
+                    document.querySelector(
+                        'input[name="ruby"]:checked'
+                    ).value,
+                conversion:
+                    document.querySelector(
+                        'input[name="conversion"]:checked'
+                    ).value,
+                voice:
+                    voiceSelect.value,
+                rate:
+                    speechRate.value,
+                pitch:
+                    speechPitch.value,
+                preventSleep:
+                    document.getElementById("preventSleep").checked
+            };
+            localStorage.setItem(
+                "aoEditorSettings",
+                JSON.stringify(settings)
+            );
+            alert("設定を保存しました。");
+        });
+    // =========================================
+    // 初期設定
+    // =========================================
+    const savedSettings =
+        JSON.parse(
+            localStorage.getItem("aoEditorSettings") || "null"
+        );
+    if (savedSettings) {
+        // フォント
+        const fontRadio =
+            document.querySelector(
+                'input[name="font"][value="' +
+                savedSettings.font + '"]'
+            );
+        if (fontRadio) {
+            fontRadio.checked = true;
+            textElement.classList.remove(
+                "gothic",
+                "mincho",
+                "mika"
+            );
+            textElement.classList.add(
+                savedSettings.font
+            );
+        }
+        // 行間
+        const lineRadio =
+            document.querySelector(
+                'input[name="line"][value="' +
+                savedSettings.line + '"]'
+            );
+        if (lineRadio) {
+            lineRadio.checked = true;
+            textElement.classList.remove(
+                "line-narrow",
+                "line-normal",
+                "line-middle"
+            );
+            textElement.classList.add(
+                savedSettings.line
+            );
+        }
+        // 注釈
+        if (typeof savedSettings.removeNotes === "boolean") {
+            document.getElementById("removeNotes").checked =
+                savedSettings.removeNotes;
+        }
+        // 漢数字変換
+        if (typeof savedSettings.convertKanjiNumber === "boolean") {
+            document.getElementById("convertKanjiNumber").checked =
+                savedSettings.convertKanjiNumber;
+        }
+        // ルビ
+        const rubyRadio =
+            document.querySelector(
+                'input[name="ruby"][value="' +
+                savedSettings.ruby + '"]'
+            );
+        if (rubyRadio) {
+            rubyRadio.checked = true;
+        }
+        // 変換
+        const conversionRadio =
+            document.querySelector(
+                'input[name="conversion"][value="' +
+                savedSettings.conversion + '"]'
+            );
+        if (conversionRadio) {
+            conversionRadio.checked = true;
+        }
+        // 音声
+        if (savedSettings.voice) {
+          savedVoiceName = savedSettings.voice;
+        }
+        // 読む速さ
+        if (savedSettings.rate) {
+            speechRate.value =
+                savedSettings.rate;
+            speechRateValue.textContent =
+                Number(savedSettings.rate).toFixed(2);
+        }
+        // 声の高さ
+        if (savedSettings.pitch) {
+            speechPitch.value =
+                savedSettings.pitch;
+            speechPitchValue.textContent =
+                Number(savedSettings.pitch).toFixed(2);
+        }
+        // スリープ防止
+        if (typeof savedSettings.preventSleep === "boolean") {
+            document.getElementById("preventSleep").checked =
+                savedSettings.preventSleep;
+        }
+    }
+    // =========================================
+    // Androidでは青空変換を無効にする
+    // =========================================
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    if (isAndroid) {
+        const aozoraConversion =
+            document.getElementById("aozoraConversion");
+        aozoraConversion.disabled = true;
+        // 青空変換が保存されていた場合だけ「変換しない」に戻す
+        if (savedSettings &&
+            savedSettings.conversion === "aozora") {
+            document.querySelector(
+                'input[name="conversion"][value="none"]'
+            ).checked = true;
+        }
+    }
+    // =========================================
+    // スライダーで読み上げ位置を移動
+    // =========================================
+    speechProgress.addEventListener("input", function() {
+        const text = textElement.textContent;
+        if (!text.length) {
+            return;
+        }
+        const percent = Number(this.value);
+        speechPosition =
+            Math.floor(text.length * percent / 100);
+        speechProgressValue.textContent =
+            percent.toFixed(1) + "%";
+        // 現在読み上げ中なら停止
+        if (speaking) {
+            speaking = false;
+            speechSynthesis.cancel();
+            releaseWakeLock();
+        }
+        // スライダー位置を本文中で選択
+        selectText(
+            speechPosition,
+            Math.min(speechPosition + 1, text.length)
+        );
+    });
+    // =========================================
+    // テキスト保存
+    // =========================================
+    document.getElementById("saveButton")
+        .addEventListener("click", async function() {
+            const text = textElement.textContent;
+            // 本文の最初の空でない行を作品名として取得
+            const lines = text
+                .split(/\r?\n/)
+                .map(line => line.trim())
+                .filter(line => line.length > 0);
+            // 先頭行が「▓。」で始まる場合は飛ばす
+            if (lines[0]?.startsWith("▓。")) {
+                lines.shift();
+            }
+            const title = lines[0] || "aozora";
+            // ファイル名に使えない文字を置き換える
+            const filename =
+                title.replace(/[\\\/:*?"<>【】|]/g, "") + ".txt";
+            const blob = new Blob(
+                [text],
+                { type: "text/plain;charset=utf-8" }
+            );
+            // Chromeなどが対応している場合
+            if (window.showSaveFilePicker) {
+                try {
+                    const handle =
+                        await window.showSaveFilePicker({
+                            suggestedName: filename,
+                            types: [{
+                                description: "テキストファイル",
+                                accept: {
+                                    "text/plain": [".txt"]
+                                }
+                            }]
+                        });
+                    const writable =
+                        await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                    return;
+                } catch (error) {
+                    // 「キャンセル」は何もしない
+                    if (error.name === "AbortError") {
+                        return;
+                    }
+                    console.log(
+                        "ファイル保存ダイアログを使用できません：",
+                        error
+                    );
+                }
+            }
+            // 非対応ブラウザ用の従来方式
+            const url =
+                URL.createObjectURL(blob);
+            const a =
+                document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => {
+                URL.revokeObjectURL(url);
+            }, 1000);
+        });
+    // =========================================
+    // 名前を付けて保存
+    // =========================================
+    document.getElementById("saveAsButton")
+        .addEventListener("click", async function() {
+            const text = textElement.textContent;
+            let filename = prompt(
+                "ファイル名を入力してください。",
+                "aozora.txt"
+            );
+            if (filename === null) {
+                return;
+            }
+            filename = filename.trim();
+            if (!filename) {
+                return;
+            }
+            // .txt がなければ付ける
+            if (!filename.toLowerCase().endsWith(".txt")) {
+                filename += ".txt";
+            }
+            // ファイル名に使えない文字を置き換える
+            filename = filename.replace(
+                /[\\\/:*?"<>【】|]/g,
+                ""
+            );
+            if (!filename) {
+                return;
+            }
+            const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+            const blob = new Blob(
+                [bom, text],
+                { type: "text/plain;charset=utf-8" }
+            );
+            // Chromeなどが対応している場合
+            if (window.showSaveFilePicker) {
+                try {
+                    const handle =
+                        await window.showSaveFilePicker({
+                            suggestedName: filename,
+                            types: [{
+                                description: "テキストファイル",
+                                accept: {
+                                    "text/plain": [".txt"]
+                                }
+                            }]
+                        });
+                    const writable =
+                        await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                    return;
+                } catch (error) {
+                    // 「キャンセル」は何もしない
+                    if (error.name === "AbortError") {
+                        return;
+                    }
+                    console.log(
+                        "ファイル保存ダイアログを使用できません：",
+                        error
+                    );
+                }
+            }
+            // 非対応ブラウザ用
+            const url =
+                URL.createObjectURL(blob);
+            const a =
+                document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => {
+                URL.revokeObjectURL(url);
+            }, 1000);
+        });
+    // =========================================
+    // テキスト読み込み
+    // =========================================
+    const loadFile =
+        document.getElementById("loadFile");
+    document.getElementById("loadButton")
+        .addEventListener("click", function() {
+            loadFile.click();
+        });
+    loadFile.addEventListener("change", function() {
+        const file = this.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function() {
+            autoSaveKey =
+                "aoEditorAutoSave:" +
+                file.name;
+            originalText = reader.result;
+            textElement.textContent = reader.result;
+            checkAutoSave();
+            undoStack.length = 0;
+            redoStack.length = 0;
+            undoStack.push(getEditorState());
+            updateUndoRedoButtons();
+        };
+        reader.readAsText(file, "UTF-8");
+        // 同じファイルをもう一度選べるようにする
+        this.value = "";
+    });
+</script>
+</body>
+</html>

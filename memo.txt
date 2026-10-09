@@ -1,0 +1,93 @@
+さて、今週末は「青空サーチ」を直したり調べたりしていこうと思います。
+まずは簡単そうなところから。「TEXT」を選んでテキスト表示させたときの文字の大きさをもう少し大きくしたいのですが、どこを直せば良かったでしょうか？「青空サーチ」の本体、index.htmlをアップロードした方が良いですか？
+
+「TEXT」を選ぶと
+http://pansy.s1010.xrea.com/aozora_search/text/55748_ruby_62786.txt
+とかに移動してテキストが表示されるようになっています。この時の文字を大きくしたいのですがWordPress側で設定したんでしたっけ？
+
+Ctrl ＋ + ：文字を大きくする
+Ctrl ＋ - ：文字を小さくする
+Ctrl ＋ 0 ：拡大率を元に戻す
+いずれも出来ました。
+ただ出来れば文字間を広く、フォントは明朝にとかしたいのですがCSSで変更した方が良いのでしょうか？
+
+出来ました。[text][text+]内容は一緒なのでひとつでいいかな。[text+]のリンクをを[text]に置き換えました。ひとつ完成です。
+
+入力、校正の表示がおかしいものがあるので、そこを調べていきたいです。
+題名,作者,入力,校正
+戦後新人論,坂口安吾,noriko saito,https://www.aozora.gr.jp/cards/001095/files/43170_ruby_33884.zip
+となってしまいますが正しくはこうです。
+戦後新人論,坂口安吾,tatsuki,noriko saito
+元にしているao_search.csvの記述が既におかしい。
+043170a,"戦後新人論",坂口安吾,新字新仮名,noriko saito,https://www.aozora.gr.jp/cards/001095/files/43170_ruby_33884.zip,00h14min,https://www.aozora.gr.jp/cards/001095/card43170.html,text/43170_ruby_33884.txt,2009-01-26
+
+さらにその元のlist_person_all_extended_utf8.csvを調べるとこれはどうやら合ってる。ということはlist_person_all_extended_utf8.csvからao_search.csvを作るところでどこか間違えてる。ここまでは突き止めました。機械的に必要項目を抜き出してるだけのはずなのになぜだろう？
+
+ああ、ちょっと話はそれますがパソコン内にいろいろフォルダを作って作業してると最新版はどれだっけって探しまわったり、古いのを直して以前修正したはずの箇所が元に戻ったりってことがあります。githubとか使えればそういうのがなくなるんじゃないかって思うのですがどうなんでしょうか？
+GitHub Desktopはインストールした覚えはないのでインストールされていないと思います。
+青空文庫関係とは別に読み上げプロジェクトというのが進行中なのですが青空変換に係わってくるのでまったく無関係という訳ではありません。こういうのはまとめてしまった方がよいのか別に分けて登録した方が良いのかどちらでしょう？
+
+なるほど。とりあえず概要だけ理解して詳細は後日と思っていたのですが、今から進めてしまった方が良いでしょうか？
+
+GitHub Desktopをインストール中です。「GitHub Desktopを認証する」として「リポジトリ」「個人ユーザーデータ」「ワークフロー」と出てきましたがどれを選びましょう？リポジトリ？
+
+GitHubのnameって登録の際にigus-cryptoと与えられてそれをそのまま使っていますがConfigue Gitの画面のnameもそのままigus-crypto（初期値）で良いでしょうか？
+
+インストールできたようです。「Let's get started!」という画面にたどり着きました。
+
+メインは専用フォルダ
+c:\sugi\kindle\aozora\aozora_all\260823青空サーチ
+に置いていますが一部
+c:\sugi\kindle\aozora\aozora_text\list_person_all_extended_utf8
+でも作業をしていて最新ファイルがそちらに置いてあるものもあります。
+GitHubの登録用に新たなフォルダを作った方が良いでしょうか？
+
+バックアップとか試験した際に作ったファイルとかあるので新たにファイルを作ることにしました。
+c:\sugi\kindle\aozora\aozora_search
+に必要なファイルを入れてここを管理していこうと思います。
+ただ秀丸マクロとかはマクロフォルダが決まっていて、そこも管理対象としたいのですがシンボリックリンクかハードリンクかすることってできたでしょうか？
+
+秀丸マクロは普段使うものは全てここに置いていて、ここにあるものすべてをgithubで管理できるようにしたいです。
+c:\users\user\appdata\roaming\hidemaruo\hidemaru\macro\yomipro
+
+了解です。yomiproフォルダは定期的に圧縮してホームページに上げていてその都度バックアップするようにしているのでその辺は大丈夫だと思います。
+
+githubへの登録も大切ですが今日の目的はおかしくなったcsvファイルを直すことがメインなのでそちらから片付けていきたいです。まずGitHub Desktopのどの項目から進めれば良いでしょうか？
+
+Add an Existing Repository from your local drive...
+Create a New Repository on your hard drive...
+どちらも見つかりました。
+
+yomipro フォルダの中に、.git という名前のフォルダはありません。
+今回対象としたいフォルダは
+c:\sugi\kindle\aozora\aozora_search
+です。将来的にこの中にyomiproフォルダあるいはyomiproフォルダへのリンクを作って管理していきたいですが今のところはそこまではしなくてもいいです。
+
+初期値はnameは空欄、local pathはC:\Users\user\OneDrive\ドキュメント\GitHub となっていました。
+これを
+name:aozora_search
+local path:C:\sugi\kindle\aozora\aozora_search
+とすれば良いですか？
+
+Name：aozora_search
+Local path：C:\sugi\kindle\aozora
+「Initialize this repository with a README」 というチェック項目はあります。他には
+Git ignore:none
+Lisense:none
+The repository will be creat at C:\sugi\kindle\aozora\aozora_search.
+Create repository/CANCEL
+となってます。
+
+local pathを
+C:\sugi\kindle\aozora\aozora_search
+としてadd repositoryしようとすると
+This directory does not appear to be a Git repository.
+Would you like to creat a repository here instead?
+と聞かれて先へ進めません。
+
+Name：aozora_search
+Local path：C:\sugi\kindle\aozora\aozora_search
+Git ignore：None
+License：None
+
+Local path：C:\sugi\kindle\aozora\aozora_search

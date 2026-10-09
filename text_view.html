@@ -1,0 +1,65 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>青空サーチ・テキスト表示</title>
+<style>
+body {
+  font-family: "Yu Mincho", "游明朝",
+    "Hiragino Mincho ProN", "Noto Serif JP", serif;
+  font-size: 18px;
+  line-height: 1.8;
+  letter-spacing: 0.08em;
+  padding: 1em;
+  max-width: 900px;
+  margin: 0 auto;
+  color: #222;
+  background: #fff;
+}
+#text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+#message {
+  font-family: sans-serif;
+  font-size: 14px;
+  letter-spacing: normal;
+}
+</style>
+</head>
+<body>
+<div id="message">テキストを読み込んでいます……</div>
+<div id="text"></div>
+<script>
+(async function() {
+  const params = new URLSearchParams(location.search);
+  const source = params.get("file");
+  if (!source) {
+    document.getElementById("message").textContent =
+      "表示するテキストが指定されていません。";
+    return;
+  }
+  try {
+    const url = new URL(source, location.href);
+    // 青空サーチ内のテキストファイルだけを許可
+    if (url.origin !== location.origin ||
+        !url.pathname.startsWith("/aozora_search/text/")) {
+      throw new Error("許可されていないファイルです。");
+    }
+    const response = await fetch(url.href);
+    if (!response.ok) {
+      throw new Error("HTTP " + response.status);
+    }
+    const text = await response.text();
+    document.getElementById("text").textContent = text;
+    document.getElementById("message").textContent = "";
+    document.title = url.pathname.split("/").pop();
+  } catch (error) {
+    document.getElementById("message").textContent =
+      "テキストを読み込めませんでした: " + error.message;
+  }
+})();
+</script>
+</body>
+</html>
