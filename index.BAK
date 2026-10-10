@@ -786,5 +786,6 @@ bodySearchButton.addEventListener("click", async function() {
  <hr>
 <footer>
   <a href="/">HOME</a>
+  <a href="/aozora_search/ao_fulltext.html">青空文庫全文検索</a>
 </footer>
 </html>
