@@ -25,7 +25,26 @@
 <button id="readingTimeSearch">絞り込む</button>
 <button id="readingTimeClear">解除</button>
 </label>
-<br><br>
+<br>
+<!-- =========================================
+     本文検索
+     ========================================= -->
+<div id="body-search" style="margin: 15px 0;">
+    <label for="bodyKeyword">本文検索：</label>
+    <input
+        type="text"
+        id="bodyKeyword"
+        placeholder="検索語を入力（調整中）"
+        style="width: 300px; max-width: 60%;"
+    >
+    <label>
+        <input type="checkbox" id="bodyRegexp">
+        正規表現
+    </label>
+    <button type="button" id="bodySearch">検索</button>
+    <br>
+</div>
+<div id="bodySearchResults"></div>
 <div id="aozora-table"></div>
 <script>
 let table;
@@ -210,6 +229,140 @@ document
         document.body.appendChild(form);
         form.submit();
         form.remove();
+    });
+// =========================================
+// 本文検索
+// =========================================
+document
+    .getElementById("bodySearch")
+    .addEventListener("click", async function() {
+        const keyword =
+            document.getElementById("bodyKeyword").value.trim();
+        const regexp =
+            document.getElementById("bodyRegexp").checked;
+        const results =
+            document.getElementById("bodySearchResults");
+        const button = document.getElementById("bodySearch");
+        if (!table) {
+            alert("作品一覧の読み込みが完了していません。");
+            return;
+        }
+        if (keyword === "") {
+            alert("検索する文字列を入力してください。");
+            return;
+        }
+        // 正規表現の構文を確認
+        if (regexp) {
+            try {
+                new RegExp(keyword);
+            } catch (e) {
+                alert("正規表現が正しくありません。\n" + e.message);
+                return;
+            }
+        }
+        // チェックされた作品があれば、その作品だけ
+        const selected = table.getSelectedData();
+        // チェックがなければ、絞り込み後の作品すべて
+        const works = selected.length > 0
+            ? selected
+            : table.getData("active");
+        const targets = works
+            .filter(row => row.text_url)
+            .map(row => ({
+                text_url: row.text_url,
+                title: row.title,
+                author: row.author,
+                card_url: row.card_url,
+                html_url: row.html_url
+            }));
+        if (targets.length === 0) {
+            results.textContent = "検索対象の作品がありません。";
+            return;
+        }
+        button.disabled = true;
+        button.textContent = "検索中…";
+        results.textContent =
+            `${targets.length}作品を検索しています。しばらくお待ちください。`;
+        try {
+            const response = await fetch("search_selected.cgi", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json; charset=UTF-8"
+                },
+                body: JSON.stringify({
+                    keyword: keyword,
+                    regexp: regexp,
+                    works: targets
+                })
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+                throw new Error(data.error || "検索に失敗しました。");
+            }
+            // 検索結果を表示
+            results.replaceChildren();
+            const summary = document.createElement("p");
+            summary.textContent =
+                `検索対象 ${targets.length}作品：` +
+                `${data.count}作品で該当しました。`;
+            results.appendChild(summary);
+            if (data.results.length === 0) {
+                const message = document.createElement("p");
+                message.textContent = "該当する作品はありませんでした。";
+                results.appendChild(message);
+                return;
+            }
+            data.results.forEach(work => {
+                const section = document.createElement("div");
+                section.style.margin = "1em 0";
+                section.style.padding = "0.5em";
+                section.style.borderBottom = "1px solid #ccc";
+                const title = document.createElement("strong");
+                title.textContent = work.title;
+                section.appendChild(title);
+                const author = document.createElement("span");
+                author.textContent = `（${work.author}）`;
+                section.appendChild(author);
+                const count = document.createElement("p");
+                count.textContent = `該当行数：${work.hit_count}`;
+                section.appendChild(count);
+                // 本文・HTML・カードへのリンク
+                const links = document.createElement("p");
+                const textLink = document.createElement("a");
+                textLink.href =
+                    "text_view.html?file=" +
+                    encodeURIComponent(work.text_url);
+                textLink.target = "_blank";
+                textLink.textContent = "[text]";
+                links.appendChild(textLink);
+                links.appendChild(document.createTextNode(" "));
+                const htmlLink = document.createElement("a");
+                htmlLink.href = work.html_url;
+                htmlLink.target = "_blank";
+                htmlLink.textContent = "[html]";
+                links.appendChild(htmlLink);
+                links.appendChild(document.createTextNode(" "));
+                const cardLink = document.createElement("a");
+                cardLink.href = work.card_url;
+                cardLink.target = "_blank";
+                cardLink.textContent = "[card]";
+                links.appendChild(cardLink);
+                section.appendChild(links);
+                // 該当箇所の抜粋
+                work.snippets.forEach(snippet => {
+                    const excerpt = document.createElement("p");
+                    excerpt.textContent = snippet;
+                    excerpt.style.marginLeft = "1em";
+                    section.appendChild(excerpt);
+                });
+                results.appendChild(section);
+            });
+        } catch (e) {
+            results.textContent = "検索エラー：" + e.message;
+        } finally {
+            button.disabled = false;
+            button.textContent = "検索";
+        }
     });
 </script>
 <!-- wp:heading {"level":3} -->
