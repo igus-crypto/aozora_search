@@ -305,6 +305,12 @@
         </div>
         <div>
             <label>
+                <input type="checkbox" id="splitByComma">
+                、で分割
+            </label>
+        </div>
+        <div>
+            <label>
                 読み上げ音声：
                 <select id="voiceSelect"></select>
             </label>
@@ -1908,9 +1914,10 @@
             return;
         }
         // 次の区切り文字を探す
-        let match = text.slice(start).match(
-            /。|！|？|――。?|……。?|\n/
-        );
+        const sentenceSeparator = document.getElementById("splitByComma").checked
+            ? /。|！|、|？|―:?―。?|─:?─。?|…:?…。?|\n/
+            : /。|！|？|―:?―。?|─:?─。?|…:?…。?|\n/;
+        let match = text.slice(start).match(sentenceSeparator);
         let end;
         if (match) {
             end = start + match.index + match[0].length;
@@ -2195,6 +2202,8 @@
                     speechRate.value,
                 pitch:
                     speechPitch.value,
+                splitByComma:
+                    document.getElementById("splitByComma").checked,
                 preventSleep:
                     document.getElementById("preventSleep").checked
             };
@@ -2296,6 +2305,10 @@
         if (typeof savedSettings.preventSleep === "boolean") {
             document.getElementById("preventSleep").checked =
                 savedSettings.preventSleep;
+        }
+        if (typeof savedSettings.splitByComma === "boolean") {
+            document.getElementById("splitByComma").checked =
+                savedSettings.splitByComma;
         }
     }
     // =========================================
