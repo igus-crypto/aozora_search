@@ -177,15 +177,11 @@
 </head>
 <body>
 <div id="settings">
-    <div class="group">
+    <div class="group" id="editorTitleGroup">
         <strong>青空エディタ試験中</strong><br>
         <div id="toolLinks">
             <a href="http://pansy.s1010.xrea.com/aozora_search/index.html">
                 青空サーチ
-            </a>
-            |
-            <a href="http://pansy.s1010.xrea.com/aozora_search/ao_fulltext.html">
-                青空文庫全文検索
             </a>
         </div>
     </div>
@@ -1997,6 +1993,7 @@
     function enterReadingMode() {
         readingMode = true;
         buttons.style.display = "none";
+        document.getElementById("editorTitleGroup").style.display = "none";
         readingModeButtons.style.display = "block";
     }
     function exitReadingMode() {
@@ -2007,6 +2004,7 @@
             releaseWakeLock();
         }
         buttons.style.display = "inline-block";
+        document.getElementById("editorTitleGroup").style.display = "inline-block";
         readingModeButtons.style.display = "none";
     }
     // 読み上げモード「停止／再生」
