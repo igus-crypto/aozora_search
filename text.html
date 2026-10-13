@@ -2035,14 +2035,24 @@
         if (pos <= 0) {
             return;
         }
-        const re =
-            /。|！|？|――。?|……。?|\n/g;
+        const re = document.getElementById("splitByComma").checked
+            ? /。|！|、|？|―:?―。?|─:?─。?|…:?…。?|\n/g
+            : /。|！|？|―:?―。?|─:?─。?|…:?…。?|\n/g;
+        // 直前の改行や空白を飛ばし、その前にある本文を探す
+        let previousContentIndex = pos - 1;
+        while (
+            previousContentIndex >= 0 &&
+            /\s|　/.test(text[previousContentIndex])
+        ) {
+            previousContentIndex--;
+        }
         let previousStart = 0;
         let match;
         while ((match = re.exec(text)) !== null) {
             const end =
                 match.index + match[0].length;
-            if (end >= pos) {
+            // 直前の文を終わらせる区切りではなく、さらに前の区切りを使う
+            if (end > previousContentIndex) {
                 break;
             }
             previousStart = end;
