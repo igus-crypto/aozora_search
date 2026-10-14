@@ -235,7 +235,11 @@ def list_replace(text,list)
       else
         pat=num+"a"
       end
-      pre,post=PAT[pat]
+      pattern=PAT[pat]
+      unless pattern
+        next
+      end
+      pre,post=pattern
       re=Regexp.new(pre+before+post)
       text=text.gsub(re){ST10+after+ST11}
     end

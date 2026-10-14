@@ -70,12 +70,12 @@ button {
 </head>
 <body>
 <h1>青空文庫全文検索</h1>
-<input type="text" id="keyword" placeholder="検索語を入力">
+<input type="text" id="keyword" placeholder="検索語を入力" readonly>
 <label>
     <input type="checkbox" id="regexp">
     正規表現
 </label>
-<button onclick="search()">検索</button>
+<button onclick="search()" disabled>検索</button>
 <div id="spinnerArea"></div>
 <div id="result"></div>
 <script>
@@ -248,7 +248,8 @@ async function search() {
 </body>
  <hr>
 <footer>
+    青空文庫全文検索は<a href="http://pansy.s1010.xrea.com/aozora_search/index.html">青空サーチ</a>に統合しました。
+  <br>
   <a href="/">HOME</a>
-  <a href="/aozora_search/index.html">青空サーチ</a>
 </footer>
 </html>
