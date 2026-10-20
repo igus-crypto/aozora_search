@@ -51,14 +51,10 @@ end
 # ルビ展開
 def ruby_expand(text)
   text = text.force_encoding("UTF-8")
-  #AR12.each{|e|
-  #  re=Regexp.new(e[0])
-  #  text=text.gsub(re,e[1])}
-  #print "AR12=";p text
   # ｜対象文字《ルビ》
-  text = text.gsub(RE11){$2}
+  text = text.gsub(RE11){$2.start_with?("#","=") ? $1 : $2}
   # 対象文字《ルビ》
-  text = text.gsub(RE12){$2}
+  text = text.gsub(RE12){$2.start_with?("#","=") ? $1 : $2}
   text
 end
 
@@ -168,12 +164,18 @@ def list_sort(arr)
       [-b[0].length,-b[1].length,b[0]]
     }.join("\n")
   }.join("\n\n")
+  s,a2=a2.partition{|x| x.split(",")[2]=="s"}
+  s_text=s.sort_by{|x|
+    b=x.split(",")
+    [-b[0].length,-b[1].length,b[0]]
+  }.join("\n")
   s2=a2.group_by{|x| x.split(",")[2]}.sort.map{|_,a|
     a.sort_by{|x|
       b=x.split(",")
       [-b[0].length,-b[1].length,b[0]]
     }.join("\n")
   }.join("\n\n").gsub(",p0","")
+  $list_sort_s=s_text
   $list_sort_f=s1
   $list_sort_normal=s2
   nil
@@ -182,15 +184,25 @@ end
 #リストによる置換
 def list_replace(text,list)
   text=text.force_encoding("UTF-8")
+  protected_replacements=[]
+  protect_replacement=lambda{|replacement|
+    token="\uE000#{protected_replacements.length}\uE001"
+    protected_replacements << [token,replacement]
+    token
+  }
+  # 入力に含まれる置換済み範囲も、後続ルールから保護する
+  marked_re=Regexp.new(Regexp.escape(ST10)+".*?"+Regexp.escape(ST11),Regexp::MULTILINE)
+  text=text.gsub(marked_re){|marked| protect_replacement.call(marked)}
   # fオプションをsオプションの置換形式に変換
-  list=list.map{|row|
+  list=list.each_with_index.sort_by{|row,index| [row[-1]=="s" ? 0 : row[-1]=="f" ? 1 : 2,index]}.map(&:first).map{|row|
     if row[-1]=="f"
       if row.length==3
         before,ruby,_=row
         ["｜?"+before+"《"+ruby+"》",before,"p18"]
       elsif row.length==4
         before,ruby,new_ruby,_=row
-        [before+"《"+ruby+"》",before+"《"+new_ruby+"》","s"]
+        new_ruby=new_ruby.gsub(%r|^\+|,"")
+        ["｜?"+before+"《"+ruby+"》",before+"《"+new_ruby+"》","p18"]
       else
         row
       end
@@ -211,10 +223,10 @@ def list_replace(text,list)
       end
       pre,post=PAT[pat]
       re=Regexp.new(pre+before+post)
-      text=text.gsub(re){ST10+after+ST11} #"✦","✧"
+      text=text.gsub(re){protect_replacement.call(ST10+after+ST11)} #"✦","✧"
     # 単純置換
     elsif opt=="s"
-      text=text.gsub(before){ST10+after+ST11}
+      text=text.gsub(before){protect_replacement.call(ST10+after+ST11)}
     # p1～p8
     elsif opt.match?(/\Ap[0-9]*[1-8]\z/)
       num="p"+opt[-1]
@@ -240,10 +252,20 @@ def list_replace(text,list)
         next
       end
       pre,post=pattern
+      # p15/p25/p35...のように、オプション末尾の数字で識別子境界を加える
+      # 5: 識別子直後の対象を除外、6: 識別子直前の対象を除外、7: 両方を除外
+      boundary=opt[-1]
+      if boundary=="5" || boundary=="7"
+        pre="(?<!\uE001)"+pre
+      end
+      if boundary=="6" || boundary=="7"
+        post=post+"(?!\uE000)"
+      end
       re=Regexp.new(pre+before+post)
-      text=text.gsub(re){ST10+after+ST11}
+      text=text.gsub(re){protect_replacement.call(ST10+after+ST11)}
     end
   }
+  protected_replacements.each{|token,replacement| text=text.gsub(token,replacement)}
   #text
   ruby_expand(text)
 end
@@ -267,8 +289,16 @@ def ao_convert(text)
   #print "m1=";p m1
   #print "m2=";p m2
   #print "m3=";p m3
-  m2=convert(m2)+ST11
+  m2=special_ruby_remove(convert(m2))+ST11
   text=m1+m2+m3
+end
+
+# 通常のルビ変換後に、特殊ルビの注記だけを除去
+def special_ruby_remove(text)
+  re=Regexp.new("｜([^《》]+)《[=#][^《》]*》".force_encoding("UTF-8"))
+  text=text.gsub(re){$1}
+  re=Regexp.new("《[=#][^《》]*》".force_encoding("UTF-8"))
+  text.gsub(re,"")
 end
 
 ##cmd確認用

@@ -459,6 +459,7 @@
             flex:1;
             border:1px solid #ccc;
         ">
+            <h4 style="margin:15px 0 5px;">sオプション</h4>
             <table style="
                 width:100%;
                 border-collapse:collapse;
@@ -502,6 +503,21 @@
                     </tr>
                 </thead>
                 <tbody id="listCheckFBody"></tbody>
+            </table>
+            <h4 style="margin:15px 0 5px;">その他のオプション</h4>
+            <table style="
+                width:100%;
+                border-collapse:collapse;
+                font-size:15px;
+            ">
+                <thead>
+                    <tr>
+                        <th style="border:1px solid #ccc; padding:5px;">置換前</th>
+                        <th style="border:1px solid #ccc; padding:5px;">置換後</th>
+                        <th style="border:1px solid #ccc; padding:5px; width:80px;">オプション</th>
+                    </tr>
+                </thead>
+                <tbody id="listCheckOtherBody"></tbody>
             </table>
         </div>
         <div style="
@@ -1533,19 +1549,48 @@
             document.getElementById("listCheckDialog");
         const listCheckBody =
             document.getElementById("listCheckBody");
+        const listCheckOtherBody =
+            document.getElementById("listCheckOtherBody");
         const listCheckFileName =
             document.getElementById("listCheckFileName");
         function updateListCheck() {
             listCheckBody.innerHTML = "";
             listCheckFBody.innerHTML = "";
+            listCheckOtherBody.innerHTML = "";
             listCheckFileName.textContent =
                 "ファイル名：" + chikanFileName;
             // Rubyで並べ替え
             rubyVM.eval("$chikan_list = " + JSON.stringify(chikanList));
             rubyVM.eval("list_sort($chikan_list)");
             // Ruby側で作った並べ替え結果を取得
+            const sText = rubyVM.eval("$list_sort_s").toString();
             const fText = rubyVM.eval("$list_sort_f").toString();
             const normalText = rubyVM.eval("$list_sort_normal").toString();
+            function appendNormalRows(text, body) {
+                if (!text) return;
+                text.split("\n").forEach(function(line) {
+                    if (!line) return;
+                    const row = line.split(",");
+                    const tr = document.createElement("tr");
+                    const tdBefore = document.createElement("td");
+                    tdBefore.textContent = row[0] || "";
+                    tdBefore.style.border = "1px solid #ccc";
+                    tdBefore.style.padding = "4px";
+                    const tdAfter = document.createElement("td");
+                    tdAfter.textContent = row[1] || "";
+                    tdAfter.style.border = "1px solid #ccc";
+                    tdAfter.style.padding = "4px";
+                    const tdOption = document.createElement("td");
+                    tdOption.textContent = row[2] || "";
+                    tdOption.style.border = "1px solid #ccc";
+                    tdOption.style.padding = "4px";
+                    tr.appendChild(tdBefore);
+                    tr.appendChild(tdAfter);
+                    tr.appendChild(tdOption);
+                    body.appendChild(tr);
+                });
+            }
+            appendNormalRows(sText, listCheckBody);
             // fオプション
             if (fText) {
                 fText.split("\n").forEach(function(line) {
@@ -1576,30 +1621,8 @@
                     listCheckFBody.appendChild(tr);
                 });
             }
-            // 通常の置換
-            if (normalText) {
-                normalText.split("\n").forEach(function(line) {
-                    if (!line) return;
-                    const row = line.split(",");
-                    const tr = document.createElement("tr");
-                    const tdBefore = document.createElement("td");
-                    tdBefore.textContent = row[0] || "";
-                    tdBefore.style.border = "1px solid #ccc";
-                    tdBefore.style.padding = "4px";
-                    const tdAfter = document.createElement("td");
-                    tdAfter.textContent = row[1] || "";
-                    tdAfter.style.border = "1px solid #ccc";
-                    tdAfter.style.padding = "4px";
-                    const tdOption = document.createElement("td");
-                    tdOption.textContent = row[2] || "";
-                    tdOption.style.border = "1px solid #ccc";
-                    tdOption.style.padding = "4px";
-                    tr.appendChild(tdBefore);
-                    tr.appendChild(tdAfter);
-                    tr.appendChild(tdOption);
-                    listCheckBody.appendChild(tr);
-                });
-            }
+            // その他の置換
+            appendNormalRows(normalText, listCheckOtherBody);
         }
         // リスト確認
         document.getElementById("listCheckBtn")
@@ -1638,6 +1661,7 @@
             .addEventListener("click", function() {
                 const optionOrder = [
                     "s",
+                    "f",
                     "",
                     "p11",
                     "p12",
@@ -1649,8 +1673,8 @@
                     "p18"
                 ];
                 chikanList.sort(function(a, b) {
-                    const ao = optionOrder.indexOf(a[2] || "");
-                    const bo = optionOrder.indexOf(b[2] || "");
+                    const ao = optionOrder.indexOf(a[a.length - 1] || "");
+                    const bo = optionOrder.indexOf(b[b.length - 1] || "");
                     const aOrder =
                         ao === -1 ? optionOrder.length : ao;
                     const bOrder =
