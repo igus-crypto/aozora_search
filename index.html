@@ -622,6 +622,7 @@ bodySearchButton.addEventListener("click", async function() {
     const groupCount = Math.min(10, targets.length);
     let outputStarted = false;
     let displayedWorkCount = 0;
+    let displayedHitCount = 0;
     let summary = null;
     let pendingGroupResults = [];
     const matchedTextUrls = new Set();
@@ -638,6 +639,7 @@ bodySearchButton.addEventListener("click", async function() {
         }
         for (const work of groupResults) {
             displayedWorkCount += 1;
+            displayedHitCount += work.hit_count;
             if (work.text_url) {
                 matchedTextUrls.add(work.text_url);
             }
@@ -645,7 +647,8 @@ bodySearchButton.addEventListener("click", async function() {
         }
         summary.textContent =
             "検索対象 " + targets.length + "作品：" +
-            displayedWorkCount + "作品で該当しました（検索中…）。";
+            displayedWorkCount + "作品で該当しました（検索中…）。" +
+            " 検索件数（該当行数）：" + displayedHitCount + "件";
     }
 
     try {
@@ -706,7 +709,8 @@ bodySearchButton.addEventListener("click", async function() {
             if (summary) {
                 summary.textContent =
                     "検索対象 " + targets.length + "作品：中断時点で" +
-                    displayedWorkCount + "作品に該当しました。";
+                    displayedWorkCount + "作品に該当しました。" +
+                    " 検索件数（該当行数）：" + displayedHitCount + "件";
             }
             bodySearchMessage.textContent = "検索を中断しました。";
             return;
@@ -718,7 +722,8 @@ bodySearchButton.addEventListener("click", async function() {
         }
         summary.textContent =
             "検索対象 " + targets.length + "作品：" +
-            displayedWorkCount + "作品で該当しました。";
+            displayedWorkCount + "作品で該当しました。" +
+            " 検索件数（該当行数）：" + displayedHitCount + "件";
         if (displayedWorkCount === 0) {
             const message = document.createElement("p");
             message.textContent = "該当する作品はありませんでした。";
@@ -753,7 +758,8 @@ bodySearchButton.addEventListener("click", async function() {
         if (summary) {
             summary.textContent =
                 "検索対象 " + targets.length + "作品：エラー発生までに" +
-                displayedWorkCount + "作品の結果を表示しました。";
+                displayedWorkCount + "作品の結果を表示しました。" +
+                " 検索件数（該当行数）：" + displayedHitCount + "件";
         }
         bodySearchMessage.textContent = "検索エラー：" + error.message;
     } finally {
