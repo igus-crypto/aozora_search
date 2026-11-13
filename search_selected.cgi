@@ -145,6 +145,9 @@ begin
   ruby_time = 0.0
   search_files = 0
 
+  repeated_filenames = works.filter_map { |work| work_filename(work) }.tally
+  scan_cache = {}
+
   check_cancelled.call
   works.each_slice(SEARCH_BATCH_SIZE) do |batch|
     check_cancelled.call
@@ -172,32 +175,37 @@ begin
 
       text_url = work["text_url"].to_s
 
-      snippets = []
-      hit_count = 0
-      line_number = 0
+      if scan_cache.key?(filename)
+        hit_count, snippets = scan_cache.fetch(filename)
+      else
+        snippets = []
+        hit_count = 0
+        line_number = 0
 
-      ruby_started = Process.clock_gettime(Process::CLOCK_MONOTONIC) if profiling
-      File.foreach(path, encoding: "UTF-8") do |line|
-        line_number += 1
-        check_cancelled.call if (line_number % 100).zero?
-        match = pattern.match(line)
-        next unless match
+        ruby_started = Process.clock_gettime(Process::CLOCK_MONOTONIC) if profiling
+        File.foreach(path, encoding: "UTF-8") do |line|
+          line_number += 1
+          check_cancelled.call if (line_number % 100).zero?
+          match = pattern.match(line)
+          next unless match
 
-        hit_count += 1
+          hit_count += 1
 
-        # 1作品あたり最大20件の抜粋を表示
-        if snippets.length < 20
-          pos = match.begin(0)
-          start_pos = [pos - 20, 0].max
-          length = [match.end(0) - start_pos + 40,
-                    line.length - start_pos].min
+          # 1作品あたり最大20件の抜粋を表示
+          if snippets.length < 20
+            pos = match.begin(0)
+            start_pos = [pos - 20, 0].max
+            length = [match.end(0) - start_pos + 40,
+                      line.length - start_pos].min
 
-          snippets << line[start_pos, length].strip
+            snippets << line[start_pos, length].strip
+          end
         end
-      end
-      check_cancelled.call
+        check_cancelled.call
 
-      ruby_time += Process.clock_gettime(Process::CLOCK_MONOTONIC) - ruby_started if profiling
+        ruby_time += Process.clock_gettime(Process::CLOCK_MONOTONIC) - ruby_started if profiling
+        scan_cache[filename] = [hit_count, snippets] if repeated_filenames.fetch(filename, 0) > 1
+      end
 
       # 該当箇所のある作品だけ返す
       if hit_count > 0

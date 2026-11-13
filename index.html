@@ -619,7 +619,7 @@ bodySearchButton.addEventListener("click", async function() {
     const profileStarted = bodySearchProfiling ? performance.now() : 0;
     const groupProfiles = [];
     let tableUpdateMs = 0;
-    const groupCount = Math.min(20, targets.length);
+    const groupCount = Math.min(10, targets.length);
     let outputStarted = false;
     let displayedWorkCount = 0;
     let summary = null;
