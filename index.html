@@ -329,6 +329,8 @@ let activeBodySearchJobId = null;
 let bodySearchCancelPending = false;
 let bodySearchStopRequested = false;
 let bodySearchInProgress = false;
+const bodySearchParams = new URLSearchParams(window.location.search);
+const bodySearchProfiling = bodySearchParams.get("search_profile") === "1";
 const bodySearchButton = document.getElementById("bodySearch");
 const bodySearchSpinner = document.getElementById("bodySearchSpinner");
 const bodySearchMessage = document.getElementById("bodySearchMessage");
@@ -371,7 +373,8 @@ async function postBodySearchRequest(payload) {
     return data;
 }
 
-async function streamBodySearchRequest(payload, onResult) {
+async function streamBodySearchRequest(payload, onResult, profile) {
+    const requestStarted = profile ? performance.now() : 0;
     const response = await fetch("search_selected.cgi", {
         method: "POST",
         headers: {
@@ -381,6 +384,11 @@ async function streamBodySearchRequest(payload, onResult) {
     });
     if (!response.ok) {
         throw new Error("検索に失敗しました。HTTP " + response.status);
+    }
+    if (profile) {
+        profile.headers_ms = performance.now() - requestStarted;
+        profile.engine = response.headers.get("X-Aozora-Search-Engine");
+        profile.decode_dispatch_ms = 0;
     }
     if (!response.body) {
         throw new Error("このブラウザーは検索結果の逐次受信に対応していません。");
@@ -400,6 +408,9 @@ async function streamBodySearchRequest(payload, onResult) {
             onResult(event.work);
         } else if (event.type === "complete") {
             terminal = { cancelled: false, count: event.count };
+            if (profile && event.profile) {
+                Object.assign(profile, event.profile);
+            }
         } else if (event.type === "cancelled") {
             terminal = { cancelled: true };
         } else if (event.type === "error") {
@@ -411,6 +422,7 @@ async function streamBodySearchRequest(payload, onResult) {
 
     while (!terminal) {
         const chunk = await reader.read();
+        const decodeStarted = profile ? performance.now() : 0;
         pending += decoder.decode(
             chunk.value || new Uint8Array(),
             { stream: !chunk.done }
@@ -423,6 +435,9 @@ async function streamBodySearchRequest(payload, onResult) {
                 break;
             }
         }
+        if (profile) {
+            profile.decode_dispatch_ms += performance.now() - decodeStarted;
+        }
         if (chunk.done) {
             break;
         }
@@ -432,6 +447,9 @@ async function streamBodySearchRequest(payload, onResult) {
     }
     if (!terminal) {
         throw new Error("検索結果の受信が途中で終了しました。");
+    }
+    if (profile) {
+        profile.search_request_ms = performance.now() - requestStarted;
     }
     return terminal;
 }
@@ -518,21 +536,17 @@ bodySearchButton.addEventListener("click", async function() {
         bodySearchCancelPending = true;
         bodySearchButton.disabled = true;
         bodySearchMessage.textContent = "検索を中断しています…";
-        if (!jobId) {
-            // 次の検索IDを準備中。IDの準備ができた後で中断処理を行う
-            return;
-        }
         try {
-            const cancelResult = await postBodySearchRequest({
-                action: "cancel",
-                job_id: jobId
-            });
-            if (!cancelResult.accepted && activeBodySearchJobId === jobId) {
-                bodySearchCancelPending = false;
-                bodySearchButton.disabled = false;
-                bodySearchButton.textContent = "中断";
-                bodySearchMessage.textContent =
-                    "中断要求が届きませんでした。もう一度お試しください。";
+            while (jobId && activeBodySearchJobId === jobId) {
+                const cancelResult = await postBodySearchRequest({
+                    action: "cancel",
+                    job_id: jobId
+                });
+                if (cancelResult.accepted) {
+                    break;
+                }
+                // 検索リクエストの到着が中断要求より遅い場合に再試行する。
+                await new Promise(resolve => setTimeout(resolve, 150));
             }
         } catch (error) {
             if (activeBodySearchJobId === jobId) {
@@ -602,6 +616,9 @@ bodySearchButton.addEventListener("click", async function() {
     bodySearchButton.disabled = false;
     bodySearchButton.textContent = "中断";
     bodySearchSpinner.hidden = false;
+    const profileStarted = bodySearchProfiling ? performance.now() : 0;
+    const groupProfiles = [];
+    let tableUpdateMs = 0;
     const groupCount = Math.min(20, targets.length);
     let outputStarted = false;
     let displayedWorkCount = 0;
@@ -650,25 +667,11 @@ bodySearchButton.addEventListener("click", async function() {
             bodySearchMessage.textContent =
                 "検索中… " + (groupIndex + 1) + " / " + groupCount + " グループ";
 
-            await postBodySearchRequest({
-                action: "start",
-                job_id: groupJobId
-            });
-            if (bodySearchStopRequested) {
-                // 中断要求が準備中に押されていた場合は、このグループを開始しない
-                await postBodySearchRequest({
-                    action: "cancel",
-                    job_id: groupJobId
-                });
-                await streamBodySearchRequest({
-                    action: "search",
-                    job_id: groupJobId,
-                    keyword: keyword,
-                    regexp: regexp,
-                    works: []
-                }, function() {});
-                cancelled = true;
-                break;
+            const groupProfile = bodySearchProfiling
+                ? { group: groupIndex + 1, works: groupWorks.length }
+                : null;
+            if (groupProfile) {
+                groupProfiles.push(groupProfile);
             }
 
             activeBodySearchJobId = groupJobId;
@@ -677,11 +680,16 @@ bodySearchButton.addEventListener("click", async function() {
                 job_id: groupJobId,
                 keyword: keyword,
                 regexp: regexp,
+                profile: bodySearchProfiling,
                 works: groupWorks
             }, function(work) {
                 pendingGroupResults.push(work);
-            });
+            }, groupProfile);
+            const renderStarted = groupProfile ? performance.now() : 0;
             appendGroupResults(pendingGroupResults);
+            if (groupProfile) {
+                groupProfile.result_dom_ms = performance.now() - renderStarted;
+            }
             pendingGroupResults = [];
             activeBodySearchJobId = null;
 
@@ -691,6 +699,7 @@ bodySearchButton.addEventListener("click", async function() {
             }
         }
 
+        const tableUpdateStarted = bodySearchProfiling ? performance.now() : 0;
         if (cancelled) {
             showBodySearchMatchesInTable(matchedTextUrls);
             table.deselectRow();
@@ -720,6 +729,9 @@ bodySearchButton.addEventListener("click", async function() {
         }
         showBodySearchMatchesInTable(matchedTextUrls);
         table.deselectRow();
+        if (bodySearchProfiling) {
+            tableUpdateMs = performance.now() - tableUpdateStarted;
+        }
         bodySearchMessage.textContent = "";
     } catch (error) {
         appendGroupResults(pendingGroupResults);
@@ -745,6 +757,22 @@ bodySearchButton.addEventListener("click", async function() {
         }
         bodySearchMessage.textContent = "検索エラー：" + error.message;
     } finally {
+        if (bodySearchProfiling) {
+            const totals = {
+                groups: groupProfiles.length,
+                total_ms: performance.now() - profileStarted,
+                table_update_ms: tableUpdateMs
+            };
+            for (const group of groupProfiles) {
+                for (const [key, value] of Object.entries(group)) {
+                    if (key !== "group" && typeof value === "number") {
+                        totals[key] = (totals[key] || 0) + value;
+                    }
+                }
+            }
+            console.table(groupProfiles);
+            console.table([totals]);
+        }
         activeBodySearchJobId = null;
         bodySearchCancelPending = false;
         bodySearchStopRequested = false;
