@@ -92,6 +92,7 @@
 <div id="aozora-table"></div>
 <script>
 let table;
+let allBodySearchWorks = [];
 let bodySearchResultTextUrls = null;
 const tableTopScrollbar = document.getElementById("tableTopScrollbar");
 const tableTopScrollbarSpacer = document.getElementById("tableTopScrollbarSpacer");
@@ -156,6 +157,8 @@ Papa.parse("ao_search.csv", {
                 ...row,
                 reading_time_minutes: toMinutes(row.reading_time)
             }));
+        // 全作品の本文検索にはCSVの順番を使う
+        allBodySearchWorks = data.slice();
         // 作品の表示順をランダムにする
         data.sort(() => Math.random() - 0.5);
         console.log(data[0]);
@@ -594,7 +597,7 @@ bodySearchButton.addEventListener("click", async function() {
     const selectedWorks = getActiveSelectedRows().map(row => row.getData());
     const works = selectedWorks.length > 0
         ? selectedWorks
-        : table.getData();
+        : allBodySearchWorks;
     const targets = works
         .filter(row => row.text_url)
         .map(row => ({

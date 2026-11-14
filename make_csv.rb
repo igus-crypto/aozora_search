@@ -20,26 +20,21 @@ File.foreach("read_time.txt",encoding:"UTF-8"){|line|
   times[zip]=[txt,time]
 }
 
-# zipごとにlist_personを分類
-works=Hash.new{|h,k| h[k]=[]}
+# 原本の行順で出力し、IDの末尾は従来どおりzipごとに採番する。
+zip_counts = Hash.new(0)
+File.foreach("list_person_all_extended_utf8.csv", encoding: "UTF-8") do |line|
+  s = nil
+  times.each do |zip, (txt, time)|
+    next unless line.include?(zip)
 
-File.foreach("list_person_all_extended_utf8.csv",encoding:"UTF-8"){|line|
-  times.each_key{|zip|
-    works[zip] << line if line.include?(zip)
-  }
-}
-
-# CSVを作成
-times.each{|zip,(txt,time)|
-  works[zip].each_with_index{|line, i|
-    s=CSV.parse_line(line)
+    s ||= CSV.parse_line(line)
     if /^[ァ-ヴー・]+$/=~s[15] + s[16]
       name=s[16] +"・"+ s[15]
     else
       name=s[15]+s[16]
     end
-      id=s[0]+(i+97).chr
-      #id=s[0]
+    id = s[0] + (97 + zip_counts[zip]).chr
+    zip_counts[zip] += 1
     if s[5]==""
       title=s[1]
     elsif /^（.*）$/=~s[4]
@@ -49,5 +44,5 @@ times.each{|zip,(txt,time)|
     end
     puts %Q|#{id},"#{title}",#{name},#{s[9]},| +
       %Q|#{s[43]},#{s[44]},#{time},#{s[13]},text/#{txt},#{s[50]}|
-  }
-}
+  end
+end
